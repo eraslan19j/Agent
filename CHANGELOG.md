@@ -4,6 +4,39 @@ Tüm önemli değişiklikler bu dosyada tutulur. Biçim: [Keep a Changelog](http
 
 ---
 
+## [0.2.0] — “Ustalık” — 2026-11-04
+
+Hareket ve dünya hissini derinleştiren sürüm: kaçınma, iniş saldırısı, fizikli nesneler ve dinamik hava.
+
+### Eklendi — Savaş
+- **Kaçınma (dash):** 0.24 s'lik hız patlaması (tepe ~19 m/s), 0.32 s dokunulmazlık, 1.0 s bekleme, 7 dayanıklılık bedeli. HUD'a ayrı ⇢ butonu, klavyede `C`
+- **Havadan iniş saldırısı:** havadayken saldırı → dalış (26 m/s), inişte 4.4 m yarıçapında 2.15× alan hasarı, prop savurma, ekran sarsıntısı ve hit-stop
+- Saldırılar, beceriler ve patlamalar artık çevredeki fizikli nesnelere de hasar veriyor
+
+### Eklendi — Fizik
+- `world/props.ts`: ~70 adet varil, sandık, çömlek ve taş blok
+  - Analitik arazi alanına karşı küre çarpışması, sekme (restitution 0.26), yüzey sürtünmesi
+  - Eğim normali boyunca yerçekimi bileşeni → **yuvarlanma** (varil/çömlek daha fazla, taş blok daha az)
+  - Oyuncu çarpması itme kuvveti, patlama dalgası itmesi, suda yüzme ve sönümleme
+  - Kırılma: parçacık patlaması, halka, Mora/kristal ganimeti
+  - Deterministik yerleşim (kamp ve mühür taşları çevresi)
+
+### Eklendi — Atmosfer
+- `world/weather.ts`: açık → yağmur → fırtına döngüsü
+- 2200 noktalı GPU yağmur (özel shader, kamerayı izleyen kutu), rüzgâr sapması
+- Sis yoğunluğu/rengi ve ton eşleme pozlaması hava durumuna göre değişiyor
+- Fırtınada şimşek: gökyüzü çakması, dallanan yıldırım VFX'i, gök gürültüsü sesi, kamera sarsıntısı
+
+### Düzeltildi
+- **Yerinde zıplama çalışmıyordu:** arazi çözümlemesi tek karelik yükselmeyi (0.14 m) yere geri yapıştırıyordu. Yükselen oyuncu artık asla aşağı sabitlenmiyor
+- Beceri bekleme süreleri karakterler arasında paylaşılıyordu → karakter başına ayrıldı
+- Kırılan proplarda renk yerine element kimliği geçilmesi (Three.js uyarısı)
+
+### Test
+- Simülasyona 17 yeni kontrol: prop itme/oturma/kırılma/ganimet/yuvarlanma, hava durumu geçişleri, dash hızı ve dokunulmazlığı, iniş saldırısı hasarı → **57 kontrol**
+
+---
+
 ## [0.1.0] — “İlk Işık” — 2026-11-04
 
 İlk oynanabilir sürüm. Android APK olarak imzalı biçimde dağıtıldı.

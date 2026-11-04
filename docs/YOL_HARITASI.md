@@ -108,3 +108,19 @@ Sürüm numarası `android/app/build.gradle` içindeki `versionCode`/`versionNam
 3. **İçerik** (bölge, düşman, görev)
 4. **Görsel parlaklık** (doku, VFX, ışık)
 5. **Meta sistemler** (yükseltme, yadigâr, sezon)
+
+
+---
+
+## ✅ v0.2 “Ustalık” — tamamlananlar
+
+| Özellik | Durum | Not |
+|---------|-------|-----|
+| Kaçınma (dash) + dokunulmazlık | ✅ | 0.24 s, tepe ~19 m/s, 1.0 s bekleme, HUD ⇢ butonu |
+| Havadan iniş saldırısı | ✅ | Dalış 26 m/s, inişte 4.4 m AoE |
+| Fizikli prop'lar | ✅ | ~70 nesne, eğimden yuvarlanma, kırılma, ganimet |
+| Dinamik hava durumu | ✅ | Yağmur shader'ı, fırtına, şimşek, gök gürültüsü |
+| Yerinde zıplama hatası | ✅ düzeltildi | Simülasyon yakaladı |
+| Karakter başına bekleme süreleri | ✅ düzeltildi | — |
+
+> Rapier (WASM) entegrasyonu v0.4'e taşındı: mevcut özel fizik 1.5 MB APK'yı koruyor ve mobilde daha öngörülebilir.

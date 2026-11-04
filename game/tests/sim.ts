@@ -141,6 +141,8 @@ import { Emitter } from '../src/core/events';
 import { QuestSystem } from '../src/systems/quests';
 import { InventorySystem } from '../src/systems/inventory';
 import { HUD } from '../src/ui/hud';
+import { Props } from '../src/world/props';
+import { Weather } from '../src/world/weather';
 import { Screens } from '../src/ui/screens';
 import { PARTY_ORDER } from '../src/data/characters';
 import { SPAWN } from '../src/data/world';
@@ -178,7 +180,7 @@ const hud = {
 };
 
 const ctx: any = {
-  engine: { hitStop: () => {}, shake: () => {}, elapsed: 0, camera, renderer: { setClearColor: () => {} } },
+  engine: { hitStop: () => {}, shake: () => {}, elapsed: 0, camera, renderer: { setClearColor: () => {}, toneMappingExposure: 1.06 } },
   terrain: new Terrain(),
   sky: new Sky(scene, 'medium'),
   water: new Water(scene),
@@ -196,6 +198,10 @@ ctx.scatter = new Scatter(ctx.terrain);
 ctx.cam = new ThirdPersonCamera(camera, ctx.terrain.heightAt);
 ctx.player = new Player(ctx, SPAWN.x, SPAWN.z);
 ctx.enemies = new EnemyManager(ctx);
+ctx.props = new Props();
+ctx.weather = new Weather(scene);
+ctx.props.build(ctx.terrain);
+ctx.weather.reset();
 ctx.world = new WorldObjects();
 ctx.quests = new QuestSystem();
 ctx.inventory = new InventorySystem(ctx);
@@ -363,6 +369,96 @@ if (victim) {
   step(90);
   ok('Düşman ölümü olayı yayınlandı', kills > 0);
   ok('Ölü düşman temizlendi', victim.removed);
+}
+
+console.log('▸ Fizikli proplar (varil/sandık/çömlek)');
+{
+  const props = ctx.props!;
+  ok('Dünya prop üretti', props.list.length > 40, `${props.list.length} prop`);
+  const target = props.list.find((p: any) => p.kind === 'crate' && !p.broken)!;
+  const start = target.pos.clone();
+  props.push(start.clone().add(new THREE.Vector3(0.6, 0, 0)), 4, 12);
+  for (let i = 0; i < 90; i++) props.update(1 / 60, ctx);
+  ok('İtme prop\'u hareket ettirdi', target.pos.distanceTo(start) > 0.5, `${target.pos.distanceTo(start).toFixed(2)} m`);
+  ok('Prop zemine oturdu', target.resting || target.vel.length() < 3, `v=${target.vel.length().toFixed(2)}`);
+
+  const aliveBefore = props.activeCount;
+  const moraBefore = ctx.save.data.player.mora;
+  const victim = props.list.find((p: any) => !p.broken)!;
+  props.damageNear(victim.pos.clone(), 2.5, 999, ctx, 'pyro');
+  ok('Kırılan prop sahneden kalktı', props.activeCount < aliveBefore, `${aliveBefore} → ${props.activeCount}`);
+  ok('Kırılan prop ganimet bıraktı', ctx.save.data.player.mora > moraBefore, `+${ctx.save.data.player.mora - moraBefore} mora`);
+
+  // props roll downhill: drop one on a slope and let gravity work
+  const slope = ctx.terrain.slopeAt(96, -96) > 0.2 ? { x: 96, z: -96 } : { x: 140, z: -60 };
+  const roller = props.list.find((p: any) => !p.broken && p !== target)!;
+  roller.pos.set(slope.x, ctx.terrain.heightAt(slope.x, slope.z) + 1.4, slope.z);
+  roller.resting = false;
+  for (let i = 0; i < 120; i++) props.update(1 / 60, ctx);
+  ok('Eğimde prop kaydı', Math.abs(roller.pos.x - slope.x) + Math.abs(roller.pos.z - slope.z) > 0.3,
+    `${(Math.abs(roller.pos.x - slope.x) + Math.abs(roller.pos.z - slope.z)).toFixed(2)} m`);
+}
+
+console.log('▸ Hava durumu (yağmur + fırtına)');
+{
+  const w = ctx.weather!;
+  ok('Hava temiz başlıyor', w.mode === 'clear' && w.intensity < 0.05);
+  w.mode = 'storm';
+  for (let i = 0; i < 300; i++) w.update(1 / 60, ctx);
+  ok('Fırtına yoğunluğu yükseldi', w.intensity > 0.4, w.intensity.toFixed(2));
+  ok('Ton eşleme pozu fırtınada düşüyor', ctx.engine.renderer.toneMappingExposure < 1.1,
+    ctx.engine.renderer.toneMappingExposure.toFixed(2));
+  w.mode = 'clear';
+  for (let i = 0; i < 600; i++) w.update(1 / 60, ctx);
+  ok('Hava tekrar açtı', w.intensity < 0.2, w.intensity.toFixed(2));
+}
+
+console.log('▸ Kaçınma (dash) ve iniş saldırısı');
+{
+  const p = ctx.player;
+  p.position.copy(new THREE.Vector3(8, ctx.terrain.heightAt(8, 34), 34));
+  p.velocity.set(0, 0, 0);
+  p.stamina = 100;
+  p.dashCd = 0;
+  ctx.input.moveX = 0;
+  ctx.input.moveY = 1;
+  const before = p.position.clone();
+  ctx.input.press('dash');
+  const dashFrames: number[] = [];
+  for (let i = 0; i < 20; i++) {
+    p.update(1 / 60, ctx);
+    dashFrames.push(Math.hypot(p.velocity.x, p.velocity.z));
+  }
+  const moved = p.position.distanceTo(before);
+  const peak = Math.max(...dashFrames);
+  ok('Dash hız kazandırdı', peak > 12, `tepe ${peak.toFixed(1)} m/s`);
+  ok('Dash mesafe kat etti', moved > 2.5, `${moved.toFixed(2)} m`);
+  ok('Dash dokunulmazlık verdi', p.invuln > 0 || p.dashCd > 0.5);
+  ok('Dash bekleme süresi başladı', p.dashCd > 0.4, p.dashCd.toFixed(2));
+  ctx.input.moveX = 0;
+  ctx.input.moveY = 0;
+
+  // plunge: jump, then attack mid-air, land and check the slam damaged a nearby enemy
+  const p2 = ctx.player;
+  p2.position.copy(new THREE.Vector3(24, ctx.terrain.heightAt(24, 8), 8));
+  p2.velocity.set(0, 0, 0);
+  p2.grounded = true;
+  p2.attackTimer = 0;
+  p2.dashTimer = 0;
+  p2.plunging = false;
+  const foe = ctx.enemies.enemies.find((e: any) => e.alive)!;
+  if (foe) {
+    foe.position.copy(p2.position.clone().add(new THREE.Vector3(0.9, 0, 0.9)));
+    foe.hp = foe.maxHp;
+  }
+  ctx.input.press('jump');
+  for (let i = 0; i < 18; i++) p2.update(1 / 60, ctx);
+  ok('Zıplama havaya kaldırdı', !p2.grounded, `y=${p2.position.y.toFixed(2)}`);
+  const foeHp = foe ? foe.hp : 0;
+  ctx.input.press('attack');
+  for (let i = 0; i < 90; i++) p2.update(1 / 60, ctx);
+  ok('Havada saldırı iniş saldırısına dönüştü', !p2.plunging && p2.grounded);
+  ok('İniş saldırısı alan hasarı verdi', !foe || foe.hp < foeHp, foe ? `${foeHp.toFixed(0)} → ${foe.hp.toFixed(0)}` : 'hedef yok');
 }
 
 console.log('▸ Arayüz (HUD + tüm ekranlar)');

@@ -296,3 +296,32 @@ push (arena/**, main) veya manuel
 4. **Yeni bölge:** `data/world.ts`'e landmark + `terrain.rawHeight`'a biyom katkısı.
 5. **Gerçek 3D model:** `entities/rig.ts` içindeki `buildCharacterRig()` yerine glTF yükleyici (bkz. `ASSET_VE_REPO_KAYNAKLARI.md`).
 6. **Çok oyunculu:** `game.ts` döngüsü 30 Hz sabit adıma alınmalı; `enemy.ts` durumları serileştirilebilir (v1.x araştırma).
+
+---
+
+## 13. Fizikli Nesneler (v0.2)
+
+Harici fizik motoru kullanılmıyor; `world/props.ts` içinde **küre–yükseklik alanı** çarpışmasına dayanan hafif bir gövde simülasyonu var.
+
+| Kavram | Uygulama |
+|--------|----------|
+| Gövde | Yarıçap + kütle + hp; konum/hız `Vector3`, görsel `Group` |
+| Çarpışma | `terrain.heightAt` ile destek yüksekliği, `terrain.normalAt` ile yüzey normali |
+| Sekme | Normal bileşeni `-vn * (1 + 0.26)` ile yansıtılır, teğetsel hız %82 sürtünme |
+| Yuvarlanma | Eğim varsa yerçekiminin teğet bileşeni eklenir (varil/çömlek 1.0, taş 0.55, sandık 0.3) |
+| Görsel dönüş | Hız vektörüne dik eksende `rotateOnWorldAxis(hız/yarıçap · dt)` |
+| Uyku | Hız < 0.32 m/s → gövde dinlenmeye alınır, simülasyon maliyeti sıfırlanır |
+| Oyuncu itmesi | Oyuncu yarıçapı içine girerse gövde dışarı itilir + hız aktarılır |
+| Patlama | `push(pos, radius, güç)` düşüş (falloff) ile radyal itme |
+| Kırılma | hp ≤ 0 → mesh kaldırılır, parçacık + halka, Mora/kristal ganimeti |
+
+Maliyet: ~70 gövde, çoğu uykuda; kare başına < 0.2 ms.
+
+## 14. Hava Durumu
+
+`world/weather.ts` üç durumlu bir makine: `clear → rain → storm`. Yoğunluk üstel yumuşatma ile geçer (yaklaşık 8 s).
+
+- **Yağmur:** 2200 noktalı `Points`, özel shader ile dikey çizgi; kamerayı izleyen 46 m'lik kutu içinde sarılır, rüzgâr sapması fırtınada 6.5 m/s.
+- **Sis:** `FogExp2` yoğunluğu 1 + 1.35 × yoğunluk, rengi `CLEAR (#b6d3ea) → RAIN (#8d9aa8) → STORM (#5f6a78)` arasında karışır.
+- **Pozlama:** fırtınada −0.10, şimşek çakmasında +0.55 (ACES ton eşleme).
+- **Şimşek:** 2.4–7.4 s aralıklı; dallanan yıldırım VFX'i, gök gürültüsü (filtreli gürültü + 58 Hz sinüs), 0.18 kamera sarsıntısı.

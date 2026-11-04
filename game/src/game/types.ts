@@ -13,6 +13,8 @@ import type { Sky } from '../world/sky';
 import type { Water } from '../world/water';
 import type { Scatter } from '../world/scatter';
 import type { WorldObjects } from '../world/worldobjects';
+import type { Props } from '../world/props';
+import type { Weather } from '../world/weather';
 import type { Effects } from '../fx/effects';
 import type { EnemyManager } from '../entities/enemy';
 import type { Player } from '../entities/player';
@@ -35,6 +37,10 @@ export interface GameContext {
   settings: SettingsSave;
   enemies: EnemyManager;
   world: WorldObjects;
+  /** destructible physics props (barrels, crates, pots, blocks) */
+  props?: Props;
+  /** dynamic weather: clear / rain / storm */
+  weather?: Weather;
   hud: HUD;
   player: Player;
   quests: QuestSystem;

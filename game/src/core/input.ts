@@ -4,6 +4,7 @@
 
 export type ActionName =
   | 'attack'
+  | 'dash'
   | 'skill'
   | 'burst'
   | 'jump'
@@ -80,6 +81,10 @@ export class Input {
       case 'KeyQ':
         this.press('burst');
         break;
+      case 'KeyC':
+      case 'ShiftRight':
+        this.press('dash');
+        break;
       case 'KeyF':
         this.press('interact');
         break;
@@ -95,7 +100,6 @@ export class Input {
       case 'Digit3': this.press('switch3'); break;
       case 'Digit4': this.press('switch4'); break;
       case 'ShiftLeft':
-      case 'ShiftRight':
         this.sprintHeld = true;
         break;
     }

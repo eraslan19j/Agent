@@ -160,6 +160,12 @@ export class AudioEngine {
   jump() { if (this.started) this.tone(420, 0.16, 0.1, 'sine', 700); }
   land() { if (this.started) this.noise(0.14, 0.14, 'lowpass', 500); }
   glide() { if (this.started) this.noise(0.5, 0.09, 'bandpass', 700, 0.6); }
+  /** distant thunder rumble */
+  thunder() {
+    if (!this.started) return;
+    this.noise(1.6, 0.20, 'lowpass', 220);
+    this.tone(58, 1.4, 0.10, 'sine', 30);
+  }
   pickup() { if (this.started) { this.tone(880, 0.12, 0.12, 'triangle'); this.tone(1320, 0.16, 0.09, 'sine', undefined, 0.06); } }
   coin() { if (this.started) { this.tone(1180, 0.08, 0.1, 'square'); this.tone(1560, 0.1, 0.08, 'square', undefined, 0.05); } }
   ui() { if (this.started) this.tone(760, 0.05, 0.06, 'sine'); }

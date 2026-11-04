@@ -14,6 +14,8 @@ import { Sky } from './world/sky';
 import { Water } from './world/water';
 import { Scatter } from './world/scatter';
 import { WorldObjects } from './world/worldobjects';
+import { Props } from './world/props';
+import { Weather } from './world/weather';
 import { Effects } from './fx/effects';
 import { EnemyManager } from './entities/enemy';
 import { Player } from './entities/player';
@@ -48,6 +50,8 @@ export class Game implements GameContext {
   settings = defaultSettings();
   enemies!: EnemyManager;
   world!: WorldObjects;
+  props!: Props;
+  weather!: Weather;
   hud!: HUD;
   player!: Player;
   quests!: QuestSystem;
@@ -138,6 +142,9 @@ export class Game implements GameContext {
       this.engine.scene.add(this.enemies.group);
       this.world = new WorldObjects();
       this.engine.scene.add(this.world.group);
+      this.props = new Props();
+      this.engine.scene.add(this.props.group);
+      this.weather = new Weather(this.engine.scene);
       this.inventory = new InventorySystem(this);
       this.hud = new HUD(this);
       this.quests.init(this);
@@ -147,6 +154,8 @@ export class Game implements GameContext {
     await this.progress(0.78, 'Gölgeler uyanıyor…', async () => {
       this.enemies.populate();
       this.world.build(this.terrain, this);
+      this.props.build(this.terrain);
+      this.weather.reset();
       this.wireEvents();
       await this.tick();
     });
@@ -242,6 +251,11 @@ export class Game implements GameContext {
       this.world = new WorldObjects();
       this.engine.scene.add(this.world.group);
       this.world.build(this.terrain, this);
+      if (this.props) {
+        this.props.clear();
+        this.props.build(this.terrain);
+      }
+      if (this.weather) this.weather.reset();
       this.quests.init(this);
       this.zoneName = '';
       this.player.healAll(1);
@@ -453,6 +467,8 @@ export class Game implements GameContext {
     this.scatter.update(focus.x, focus.z);
     this.water.update(dt, cam.position, this.sky.sunDirection, this.sky.dayFactor);
     this.effects.update(dt);
+    this.props?.update(dt, this);
+    this.weather?.update(dt, this);
     this.audio.updateMusic(raw, 0);
     this.engine.renderer.setClearColor(this.sky.rendererClear);
   }
@@ -493,6 +509,8 @@ export class Game implements GameContext {
     // ---- simulation ----
     this.enemies.update(dt, p.position);
     this.world.update(dt, this);
+    this.props?.update(dt, this);
+    this.weather?.update(dt, this);
     this.effects.update(dt);
     this.quests.update(dt);
     this.hud.update(dt);

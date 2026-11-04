@@ -82,6 +82,14 @@ export class Player {
   }
   switchCd = 0;
   hurtTimer = 0;
+
+  // dodge / plunge
+  dashTimer = 0;
+  dashCd = 0;
+  readonly dashDuration = 0.24;
+  readonly dashDir = new THREE.Vector3(0, 0, 1);
+  plunging = false;
+  private plungeBase = 0;
   footstepTimer = 0;
   private zones: DamageZone[] = [];
   private elapsed = 0;
@@ -197,6 +205,7 @@ export class Player {
       if (this.skillCds[id] > 0) this.skillCds[id] = Math.max(0, this.skillCds[id] - dt);
     }
     if (this.comboTimer > 0) this.comboTimer -= dt;
+    if (this.dashCd > 0) this.dashCd = Math.max(0, this.dashCd - dt);
     if (this.hurtTimer > 0) this.hurtTimer -= dt;
     if (this.shieldHp > 0) {
       this.shieldHp = Math.max(0, this.shieldHp - dt * 2.5);
@@ -218,6 +227,7 @@ export class Player {
     const wantAttack = input.consume('attack');
     const wantSkill = input.consume('skill');
     const wantBurst = input.consume('burst');
+    const wantDash = input.consume('dash');
     for (let i = 0; i < 4; i++) {
       if (input.consume(`switch${i + 1}` as any)) this.switchTo(i);
     }
@@ -268,6 +278,12 @@ export class Player {
       }
     }
 
+    // ---- state: dodge/dash ----
+    if (wantDash && this.dashCd <= 0 && this.dashTimer <= 0 && !this.climbing && !this.swimming && this.busyKind !== 'burst') {
+      this.startDash(ctx, wish, wishLen);
+    }
+    const dashing = this.dashTimer > 0;
+
     // ---- state: swimming ----
     if (inWater && !this.climbing) {
       this.swimming = true;
@@ -298,10 +314,26 @@ export class Player {
     const canSprint = sprintHeld && this.stamina > 1 && wishLen > 0.2 && !attacking && !busy && !this.climbing && !this.swimming;
     const speed = def.moveSpeed * (canSprint ? 1.7 : 1) * moveScale;
 
-    if (!this.climbing && !this.swimming) {
+    if (!this.climbing && !this.swimming && !dashing) {
       const accel = this.grounded ? 16 : 6;
       this.velocity.x = damp(this.velocity.x, wish.x * speed, accel, dt);
       this.velocity.z = damp(this.velocity.z, wish.z * speed, accel, dt);
+    }
+    if (dashing) {
+      this.dashTimer -= dt;
+      const k = clamp(this.dashTimer / this.dashDuration, 0, 1);
+      const dashSpeed = 7 + 12 * k * k;
+      this.velocity.x = this.dashDir.x * dashSpeed;
+      this.velocity.z = this.dashDir.z * dashSpeed;
+      if (!this.grounded) this.velocity.y = Math.max(this.velocity.y, -4);
+      if (this.dashTimer <= 0) {
+        this.dashTimer = 0;
+        this.velocity.x *= 0.45;
+        this.velocity.z *= 0.45;
+      }
+      if (Math.random() < dt * 30) {
+        ctx.effects.trail(new THREE.Vector3(this.position.x, this.position.y + 0.25, this.position.z), '#dcefff', 2, 0.5);
+      }
     }
 
     if (canSprint) this.stamina -= SPRINT_DRAIN * dt;
@@ -347,6 +379,10 @@ export class Player {
 
     // terrain resolution
     const newGround = ctx.terrain.heightAt(this.position.x, this.position.z);
+    if (this.plunging && this.position.y - newGround < 1.1) {
+      this.plunging = false;
+      this.plungeImpact(ctx, newGround);
+    }
     if (this.position.y <= newGround) {
       if (!this.grounded && this.velocity.y < -6) {
         ctx.audio.land();
@@ -357,6 +393,9 @@ export class Player {
       this.grounded = true;
       this.gliding = false;
       this.climbing = false;
+    } else if (this.velocity.y > 0.01) {
+      // rising (jump / ramp / launch): never snap back down, even on the first frame
+      this.grounded = false;
     } else if (this.position.y > newGround + 0.35) {
       this.grounded = false;
     } else {
@@ -443,6 +482,8 @@ export class Player {
 
   private resolveAnimState(speed: number, attacking: boolean): any {
     if (this.hurtTimer > 0) return 'hurt';
+    if (this.plunging) return 'fall';
+    if (this.dashTimer > 0) return 'sprint';
     if (this.busyKind === 'burst') return 'burst';
     if (this.busyKind === 'skill') return 'skill';
     if (attacking) return 'attack';
@@ -458,7 +499,68 @@ export class Player {
   /* =======================================================
      Combat actions
      ======================================================= */
+  /** Dodge roll: short burst of speed with invulnerability frames. */
+  startDash(ctx: GameContext, wish: THREE.Vector3, wishLen: number) {
+    if (this.stamina < 6) return;
+    const dir = wishLen > 0.2
+      ? new THREE.Vector3(wish.x, 0, wish.z).normalize()
+      : new THREE.Vector3(Math.sin(this.facing), 0, Math.cos(this.facing));
+    this.dashDir.copy(dir);
+    this.dashTimer = this.dashDuration;
+    this.dashCd = 1.0;
+    this.stamina = Math.max(0, this.stamina - 7);
+    this.invuln = Math.max(this.invuln, 0.32);
+    this.facing = Math.atan2(dir.x, dir.z);
+    this.attackTimer = 0;
+    this.attackHitDone = false;
+    this.gliding = false;
+    ctx.audio?.swing?.('light');
+    const at = new THREE.Vector3(this.position.x, this.position.y + 0.2, this.position.z);
+    ctx.effects.burst(at, '#dff0ff', 10, 2.6, 0.35, 4);
+    ctx.effects.ring(at, '#bfe6ff', 0.2, 1.8, 0.3);
+  }
+
+  /** Dive attack from the air: heavy AoE slam on landing. */
+  private startPlunge(ctx: GameContext) {
+    this.plunging = true;
+    this.gliding = false;
+    this.attackTimer = 0;
+    this.attackHitDone = true;
+    this.velocity.y = -26;
+    this.plungeBase = this.atk;
+    ctx.audio?.glide?.();
+    ctx.effects.ring(this.position.clone(), ELEMENTS[this.activeDef.element].color, 1.2, 0.4, 0.25);
+  }
+
+  private plungeImpact(ctx: GameContext, groundY: number) {
+    const def = this.activeDef;
+    const at = new THREE.Vector3(this.position.x, groundY + 0.3, this.position.z);
+    const radius = 4.4;
+    ctx.enemies.damageInRadius(at, radius, {
+      atk: this.plungeBase,
+      power: 2.15,
+      critRate: this.critRate,
+      critDmg: this.critDmg,
+      element: def.element,
+      knockback: 2.2,
+    });
+    ctx.props?.damageNear(at, radius, this.plungeBase * 1.6, ctx, def.element);
+    ctx.props?.push(at, radius * 1.3, 9);
+    ctx.effects.ring(at, ELEMENTS[def.element].color, 0.3, radius, 0.55);
+    ctx.effects.burst(at, '#e9e0cc', 24, 6, 0.6, 9);
+    ctx.effects.burst(at, ELEMENTS[def.element].color, 16, 4.5, 0.5, 7);
+    ctx.requestShake(0.55);
+    ctx.requestHitStop(0.08);
+    ctx.audio?.land?.();
+    this.currentEnergy += 6;
+  }
+
   startAttack(ctx: GameContext) {
+    // attacking in mid-air becomes a dive slam
+    if (!this.grounded && !this.climbing && !this.swimming && !this.plunging && this.velocity.y < 3.5) {
+      this.startPlunge(ctx);
+      return;
+    }
     if (this.attackTimer > 0) {
       this.attackQueued = true;
       return;
@@ -502,6 +604,7 @@ export class Player {
           from: origin,
         });
       }
+      ctx.props?.damageNear(hitPos, 1.5, this.atk * 1.1 * mult, ctx, element);
       return;
     }
 
@@ -526,6 +629,7 @@ export class Player {
       // whiff — small energy, keeps feedback honest
       this.currentEnergy += 0.4;
     }
+    ctx.props?.damageNear(arcPos, def.reach * 0.9, this.atk * (isFinisher ? 1.4 : 0.9), ctx, element);
   }
 
   useSkill(ctx: GameContext) {
@@ -652,6 +756,8 @@ export class Player {
           critRate: this.critRate * 0.6, critDmg: this.critDmg,
           element: z.element, knockback: z.pull ? 0 : 0.35, pull: z.pull,
         });
+        ctx.props?.damageNear(z.pos, z.radius, this.atk * z.power * 0.8, ctx, z.element);
+        ctx.props?.push(z.pos, z.radius, z.pull ? -3 : 2.5);
         ctx.effects.ring(z.pos, ELEMENTS[z.element].color, 0.25, z.radius, 0.45);
         if (Math.random() < 0.6) {
           ctx.effects.burst(new THREE.Vector3(

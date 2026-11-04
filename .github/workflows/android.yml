@@ -100,14 +100,14 @@ jobs:
         run: |
           mkdir -p out
           APK=$(find android/app/build/outputs/apk/release -name '*.apk' | head -1)
-          cp "$APK" out/Aetherion-0.1.0.apk
+          cp "$APK" out/Aetherion-0.2.0.apk
           ls -lh out
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: Aetherion-APK
-          path: out/Aetherion-0.1.0.apk
+          path: out/Aetherion-0.2.0.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -117,14 +117,23 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release delete apk-latest --yes --cleanup-tag 2>/dev/null || true
-          gh release create apk-latest out/Aetherion-0.1.0.apk \
-            --title "AETHERION — APK (${GITHUB_SHA:0:7})" \
-            --notes "AETHERION v0.1.0 “İlk Işık” — signed release APK, built from $(git rev-parse --short HEAD) on branch ${GITHUB_REF_NAME}.
+          gh release create apk-latest out/Aetherion-0.2.0.apk \
+            --title "AETHERION v0.2.0 — APK (${GITHUB_SHA:0:7})" \
+            --notes "**AETHERION v0.2.0 “Ustalık”** — imzalı release APK · $(git rev-parse --short HEAD) · ${GITHUB_REF_NAME}
 
-          Kurulum: APK'yı indir, telefonda 'bilinmeyen kaynaklardan kurulum'a izin ver, yatay modda aç.
+          **Kurulum:** APK'yı indir → telefonda “bilinmeyen kaynaklardan kuruluma izin ver” → kur → yatay tut.
 
-          - 4 oynanabilir karakter (Anemo / Pyro / Electro / Cryo)
-          - Element tepkimeleri: Buharlaşma, Erime, Aşırı Yük, Donma, Girdap, Kristalleşme
-          - Sürüklenme, tırmanma, yüzme, dayanıklılık
-          - Prosedürel açık dünya, gündüz-gece, mühür taşları, sandıklar, görev zinciri" \
+          ### Bu sürümde
+          - **Kaçınma (dash):** 0.24 s hız patlaması + dokunulmazlık kareleri, ekranda ⇢ butonu
+          - **Havadan iniş saldırısı:** zıpladıktan sonra ⚔ → 4.4 m yarıçapında alan hasarı + sarsıntı
+          - **Fizikli dünya:** ~70 varil/sandık/çömlek/taş bloğu; itilir, eğimden yuvarlanır, kırılıp ganimet düşürür
+          - **Dinamik hava:** açık → yağmur → fırtına döngüsü, şimşek çakması, gök gürültüsü, ıslak sis
+          - Yerinde zıplama düzeltildi (arazi çözümlemesi zıplamayı yutuyordu)
+          - Beceri bekleme süreleri artık karakter başına
+
+          ### Temel özellikler
+          - 4 oynanabilir karakter (Anemo / Pyro / Electro / Cryo), 10 element tepkimesi
+          - Koşma, zıplama, süzülme, tırmanma, yüzme, dayanıklılık
+          - Prosedürel açık dünya (960×960 m), gündüz-gece, mühür taşları, sandıklar, görev zinciri
+          - Otomatik kayıt, envanter, kodeks, harita" \
             --latest
