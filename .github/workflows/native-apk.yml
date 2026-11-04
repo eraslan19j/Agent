@@ -7,6 +7,9 @@ on:
       - '.github/workflows/native-apk.yml'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -68,7 +71,22 @@ jobs:
 
       - name: Assemble release APK
         working-directory: native
-        run: gradle --no-daemon --stacktrace assembleRelease
+        run: |
+          set -o pipefail
+          gradle --no-daemon --stacktrace assembleRelease 2>&1 | tee /tmp/build.log
+
+      # Makes CI diagnostics readable from outside the runner (log downloads are not always reachable).
+      - name: Publish build log
+        if: always()
+        run: |
+          mkdir -p .ci
+          if [ -f /tmp/build.log ]; then cp /tmp/build.log .ci/last-build.log; else echo "no log" > .ci/last-build.log; fi
+          tail -70 .ci/last-build.log || true
+          git config user.email "ci@aetherion.ai"
+          git config user.name "Aetherion CI"
+          git add .ci/last-build.log
+          git commit -m "ci: native build log" || true
+          git push || true
 
       - name: Verify APK signature
         run: |
