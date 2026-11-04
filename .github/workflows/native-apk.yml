@@ -1,0 +1,123 @@
+name: Native APK
+
+on:
+  push:
+    paths:
+      - 'native/**'
+      - '.github/workflows/native-apk.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Host unit tests (C++ core)
+        run: |
+          set -e
+          g++ --version | head -1
+          g++ -std=c++17 -O2 -I native/app/src/main/cpp \
+              native/app/src/main/cpp/game.cpp native/tests/core_test.cpp \
+              -o /tmp/core_test
+          /tmp/core_test
+
+      - name: Prepare Android SDK / NDK / CMake
+        run: |
+          set -e
+          SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          if [ -z "$SDK" ]; then
+            SDK=$(dirname "$(dirname "$(command -v sdkmanager || echo /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager)")")
+          fi
+          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          echo "SDK = $SDK"
+          ls "$SDK" || true
+
+          SDKMGR=$(command -v sdkmanager || echo "$SDK/cmdline-tools/latest/bin/sdkmanager")
+          NDK_DIR=$(ls -d "$SDK"/ndk/* 2>/dev/null | sort -V | tail -1 || true)
+          if [ -n "$NDK_DIR" ]; then
+            NDK_VER=$(basename "$NDK_DIR")
+            echo "Preinstalled NDK: $NDK_VER"
+          else
+            echo "Installing NDK 27.0.12077973"
+            yes | "$SDKMGR" --install "ndk;27.0.12077973" > /dev/null 2>&1 || true
+            NDK_VER=27.0.12077973
+          fi
+          sed -i "s/ndkVersion '[^']*'/ndkVersion '$NDK_VER'/" native/app/build.gradle
+
+          if [ -d "$SDK/cmake/3.22.1" ]; then
+            echo "CMake 3.22.1 present"
+          else
+            echo "Installing cmake;3.22.1"
+            yes | "$SDKMGR" --install "cmake;3.22.1" > /dev/null 2>&1 || true
+            sed -i "s/version '3.22.1'//" native/app/build.gradle
+          fi
+
+      - name: Assemble release APK
+        working-directory: native
+        run: gradle --no-daemon --stacktrace assembleRelease
+
+      - name: Verify APK signature
+        run: |
+          set -e
+          SDK="${ANDROID_SDK_ROOT}"
+          APKSIGNER=$(find "$SDK" -name apksigner -type f | sort | tail -1)
+          APK=$(find native/app/build/outputs/apk/release -name '*.apk' | head -1)
+          echo "APK: $APK"
+          ls -lh "$APK"
+          "$APKSIGNER" verify --print-certs "$APK"
+
+      - name: Rename artifact
+        run: |
+          mkdir -p out
+          APK=$(find native/app/build/outputs/apk/release -name '*.apk' | head -1)
+          cp "$APK" out/Aetherion-Native-0.3.0.apk
+          ls -lh out
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Aetherion-Native-APK
+          path: out/Aetherion-Native-0.3.0.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish rolling release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete apk-latest --yes --cleanup-tag 2>/dev/null || true
+          gh release create apk-latest out/Aetherion-Native-0.3.0.apk \
+            --title "AETHERION v0.3.0 NATIVE — APK (${GITHUB_SHA:0:7})" \
+            --notes "**AETHERION v0.3.0 — Native (C++ / OpenGL ES 3 + Kotlin)** · $(git rev-parse --short HEAD)
+
+          İlk native sürüm. WebView yok: render motoru C++ (NDK), arayüz Kotlin + Material 3.
+
+          **Kurulum:** APK'yı indir → 'bilinmeyen kaynaklara izin ver' → kur → yatay aç.
+
+          ### Yeni
+          - C++/OpenGL ES 3 renderer: gölge haritası, HDR + bloom, ACES ton eşleme, rim/cel aydınlatma, sis, su shader'ı
+          - Prosedürel açık dünya: 96 m'lik chunk'lar, 5x5 akış, ağaç/kaya örnekleme
+          - İskeletli karakter: 21 kemik, GPU skinning, 13 animasyon durumu (koşu, sprint, zıplama, süzülme, 3'lü kombo, yetenek, dash, hasar, ölüm)
+          - Parçacık VFX + kılıç izi + hit-stop + kamera sarsıntısı
+          - Material 3 arayüz: karakter seçim ekranı (element auraları, kart animasyonları), ayarlar
+          - **Joystick düzeltmesi:** ekran yukarısı artık ileri; joystick sağ/sol seçilebilir (Genshin'de sol)
+
+          ### Bilinen eksikler (v0.4)
+          - Düşman çeşitliliği ve boss
+          - Gerçek glTF karakter modelleri (şu an prosedürel iskelet)
+          - Envanter/görev arayüzleri" \
+            --latest

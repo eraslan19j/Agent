@@ -4,10 +4,6 @@ name: Android APK
 # Runs on every push to a session branch, and can be started manually.
 
 on:
-  push:
-    branches:
-      - 'arena/**'
-      - main
   workflow_dispatch:
 
 permissions:
@@ -116,8 +112,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release delete apk-latest --yes --cleanup-tag 2>/dev/null || true
-          gh release create apk-latest out/Aetherion-0.2.0.apk \
+          gh release delete apk-web --yes --cleanup-tag 2>/dev/null || true
+          gh release create apk-web out/Aetherion-0.2.0.apk \
             --title "AETHERION v0.2.0 — APK (${GITHUB_SHA:0:7})" \
             --notes "**AETHERION v0.2.0 “Ustalık”** — imzalı release APK · $(git rev-parse --short HEAD) · ${GITHUB_REF_NAME}
 

@@ -1,0 +1,337 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/deep_night">
+
+    <ai.aetherion.nativeapp.GameSurfaceView
+        android:id="@+id/game"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <ai.aetherion.nativeapp.HudView
+        android:id="@+id/hud"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone" />
+
+    <!-- ============ main menu ============ -->
+    <FrameLayout
+        android:id="@+id/menuRoot"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/bg_vista">
+
+        <LinearLayout
+            android:id="@+id/screenMenu"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="64dp"
+            android:paddingEnd="64dp">
+
+            <LinearLayout
+                android:id="@+id/titleBlock"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/titleSmall"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="BÖLÜM I · VADİ"
+                    android:letterSpacing="0.42"
+                    android:textSize="12sp"
+                    android:textColor="@color/gold" />
+
+                <TextView
+                    android:id="@+id/titleMain"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="AETHERION"
+                    android:letterSpacing="0.14"
+                    android:textSize="62sp"
+                    android:fontFamily="serif"
+                    android:textStyle="bold"
+                    android:textColor="#FFF7EEDC"
+                    android:shadowColor="#6634D6B0"
+                    android:shadowRadius="28"
+                    android:shadowDx="0"
+                    android:shadowDy="0" />
+
+                <View
+                    android:layout_width="260dp"
+                    android:layout_height="2dp"
+                    android:layout_marginTop="6dp"
+                    android:layout_marginBottom="14dp"
+                    android:background="@drawable/divider_gold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/subtitle"
+                    android:textColor="@color/text_dim"
+                    android:textSize="15sp"
+                    android:letterSpacing="0.06" />
+
+                <LinearLayout
+                    android:id="@+id/menuButtons"
+                    android:layout_width="300dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="34dp"
+                    android:orientation="vertical">
+
+                    <androidx.appcompat.widget.AppCompatButton
+                        android:id="@+id/btnNew"
+                                               android:layout_width="match_parent"
+                        android:layout_height="58dp"
+                        android:background="@drawable/btn_gold"
+                        android:text="@string/new_journey"
+                        android:textColor="#FF1A1206"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:letterSpacing="0.12" />
+
+                    <androidx.appcompat.widget.AppCompatButton
+                        android:id="@+id/btnChars"
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:layout_marginTop="12dp"
+                        android:background="@drawable/btn_ghost"
+                        android:text="@string/characters"
+                        android:textColor="#FFE8C983"
+                        android:textSize="14sp"
+                        android:letterSpacing="0.12" />
+
+                    <androidx.appcompat.widget.AppCompatButton
+                        android:id="@+id/btnSettings"
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:layout_marginTop="12dp"
+                        android:background="@drawable/btn_ghost"
+                        android:text="@string/settings"
+                        android:textColor="#FFE8C983"
+                        android:textSize="14sp"
+                        android:letterSpacing="0.12" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/gpuInfo"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="22dp"
+                    android:text=""
+                    android:textColor="#66FFFFFF"
+                    android:textSize="9sp"
+                    android:maxLines="2" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="0.85"
+                android:orientation="vertical"
+                android:gravity="center">
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="◈"
+                    android:textSize="150sp"
+                    android:textColor="#33A8D8FF" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="4 yoldaş · 10 element tepkimesi\nprosedürel açık dünya"
+                    android:gravity="center"
+                    android:textSize="12sp"
+                    android:lineSpacingExtra="4dp"
+                    android:textColor="#88C9D4E3" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- ============ character select ============ -->
+        <LinearLayout
+            android:id="@+id/screenChars"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:gravity="center_horizontal"
+            android:paddingTop="26dp"
+            android:paddingBottom="22dp"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="YOLDAŞINI SEÇ"
+                android:letterSpacing="0.36"
+                android:textSize="13sp"
+                android:textColor="@color/gold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Dört elementin taşıyıcısı"
+                android:textColor="#FFF7EEDC"
+                android:textSize="24sp"
+                android:fontFamily="serif"
+                android:layout_marginTop="4dp" />
+
+            <LinearLayout
+                android:id="@+id/cardRow"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:layout_marginTop="22dp"
+                android:paddingStart="34dp"
+                android:paddingEnd="34dp"
+                android:orientation="horizontal"
+                android:gravity="center" />
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="16dp">
+
+                <androidx.appcompat.widget.AppCompatButton
+                        android:id="@+id/btnBack"
+                    android:layout_width="130dp"
+                    android:layout_height="52dp"
+                    android:background="@drawable/btn_ghost"
+                    android:text="GERİ"
+                    android:textColor="#FFE8C983"
+                    android:textSize="13sp"
+                    android:letterSpacing="0.16" />
+
+                <androidx.appcompat.widget.AppCompatButton
+                        android:id="@+id/btnStart"
+                    android:layout_width="240dp"
+                    android:layout_height="52dp"
+                    android:layout_marginStart="16dp"
+                    android:background="@drawable/btn_gold"
+                    android:text="@string/start"
+                    android:textColor="#FF1A1206"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.14" />
+            </LinearLayout>
+        </LinearLayout>
+    </FrameLayout>
+
+    <!-- ============ pause / settings panel ============ -->
+    <FrameLayout
+        android:id="@+id/pauseRoot"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#CC04070D"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:id="@+id/pausePanel"
+            android:layout_width="420dp"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:orientation="vertical"
+            android:background="@drawable/panel_dark"
+            android:padding="26dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="DURAKLATILDI"
+                android:letterSpacing="0.3"
+                android:textSize="12sp"
+                android:textColor="@color/gold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Ayarlar"
+                android:textColor="#FFF7EEDC"
+                android:textSize="26sp"
+                android:fontFamily="serif"
+                android:layout_marginTop="2dp"
+                android:layout_marginBottom="18dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Parlaklık"
+                android:textColor="@color/text_dim"
+                android:textSize="12sp" />
+            <SeekBar
+                android:id="@+id/sliderBrightness"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:max="200"
+                android:progress="100" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="Kamera hassasiyeti"
+                android:textColor="@color/text_dim"
+                android:textSize="12sp" />
+            <SeekBar
+                android:id="@+id/sliderSensitivity"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:max="250"
+                android:progress="100" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Joystick sağda"
+                    android:textColor="#FFE9EEF7"
+                    android:textSize="14sp" />
+
+                <Switch
+                    android:id="@+id/switchJoySide"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:orientation="horizontal">
+
+                <androidx.appcompat.widget.AppCompatButton
+                        android:id="@+id/btnResume"
+                    android:layout_width="0dp"
+                    android:layout_height="50dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/btn_gold"
+                    android:text="DEVAM"
+                    android:textColor="#FF1A1206"
+                    android:textStyle="bold" />
+
+                <androidx.appcompat.widget.AppCompatButton
+                        android:id="@+id/btnQuit"
+                    android:layout_width="0dp"
+                    android:layout_height="50dp"
+                    android:layout_weight="1"
+                    android:layout_marginStart="12dp"
+                    android:background="@drawable/btn_ghost"
+                    android:text="ANA MENÜ"
+                    android:textColor="#FFE8C983" />
+            </LinearLayout>
+        </LinearLayout>
+    </FrameLayout>
+</FrameLayout>

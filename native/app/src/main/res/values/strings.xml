@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AETHERION</string>
+    <string name="subtitle">Yedi Elementin Yankısı</string>
+    <string name="new_journey">Yeni Yolculuk</string>
+    <string name="characters">Karakterler</string>
+    <string name="settings">Ayarlar</string>
+    <string name="start">YOLCULUĞA ÇIK</string>
+</resources>
