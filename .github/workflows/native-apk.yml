@@ -85,8 +85,8 @@ jobs:
           git config user.email "ci@aetherion.ai"
           git config user.name "Aetherion CI"
           git add .ci/last-build.log
-          git commit -m "ci: native build log" || true
-          git push || true
+          git commit -m "ci: native build log [skip ci]" || true
+          git push origin "HEAD:${GITHUB_REF_NAME}" || echo "log push failed (non fatal)"
 
       - name: Verify APK signature
         run: |
