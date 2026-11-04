@@ -4,6 +4,38 @@ Tüm önemli değişiklikler bu dosyada tutulur. Biçim: [Keep a Changelog](http
 
 ---
 
+## [0.3.0] — "Kıvılcım" (NATIVE) — 2026-11-05
+
+**Mimari değişti: WebView/three.js bırakıldı.** Oyun artık gerçek bir Android uygulaması:
+C++17 + OpenGL ES 3.0 çekirdek (NDK/CMake), Kotlin + Material 3 arayüz. Web katmanı yok.
+
+### Eklendi — C++ motoru (`native/app/src/main/cpp`)
+- **Renderer:** HDR (RGBA16F, desteklenmezse RGBA8'e düşer), gölge haritası (1024², 3×3 PCF), HDR bloom (bright + 2 geçişli blur), ACES ton eşleme, vinyet, filmik kontrast, dithering
+- **Shader'lar:** gökyüzü (gradyan + güneş diski + prosedürel bulutlar + yıldızlar), arazi/prop (wrap lighting + sis + su kenarı ıslaklığı), iskeletli karakter (cel benzeri iki bantlı aydınlatma + rim light + hit flash), su (dalga + fresnel + güneş parıltısı), parçacık (yuvarlak sprite), kılıç izi (ribbon)
+- **Dünya:** analitik yükseklik alanı (fbm + ridged + göl havzası + nehir vadisi), 96 m'lik chunk'lar, 5×5 akış, tepe noktası renkleriyle biyom boyama, ağaç/kaya örnekleme
+- **Karakter:** 21 kemikli iskelet, GPU skinning (2 kemik/ağırlık), prosedürel gövde üretimi (gövde, kol, bacak, bot, kılıç), palet kodlu vertex renkleri
+- **Animasyon:** 13 durum — idle, koşu, sprint, zıplama, düşme, süzülme, 3'lü kombo, yetenek, dash, hasar, ölüm. Antisipasyon/vuruş/toparlanma eğrileri, kalça salınımı, gövde karşı dönüşü, baş stabilizasyonu, durumlar arası yumuşak geçiş
+- **Savaş:** kamera-göreli hareket, 3 vuruşluk kombo (×1.00/×1.05/×1.45), kritik, koni isabet, geri tepme, hit-stop, kamera sarsıntısı, parçacık patlamaları, kılıç izi
+- **Hareket:** zıplama, ikinci basışta süzülme, dash (0.24 s + 0.32 s dokunulmazlık), havadan iniş saldırısı (4.4 m AoE), dayanıklılık
+- **Düşmanlar:** 14 düşman, agresyon, kovalama, menzil koruma, telegraph → vuruş, hasar flaşı, ölüm animasyonu
+- **Gündüz döngüsü:** 8 dakikalık tam tur, güneş/ay rengi, sis yoğunluğu ve pozlama geçişleri
+
+### Eklendi — Kotlin / Material 3
+- `MainActivity`: ana menü, **karakter seçim ekranı** (element renkli auralar, kart yükselme animasyonu, nabız efektli seçim), ayarlar paneli
+- `HudView`: Canvas ile çizilen joystick, 4 eylem butonu (saldırı/yetenek/dash/zıplama), can-dayanıklılık-enerji barları, parti portreleri, bekleme süresi yaylarosı
+- **Joystick düzeltmesi:** ekranın yukarısı artık kesin olarak "ileri" (eski sürümde ters çalışıyordu) + **joystick sağ/sol seçilebilir** (varsayılan sol, Genshin gibi)
+- Ayarlar SharedPreferences'a yazılıyor (parlaklık, hassasiyet, joystick tarafı)
+- Tam ekran immersive, yatay kilidi, ekran açık kalma
+
+### Test
+- `native/tests/core_test.cpp` — 30 host testi (arazi sürekliliği, chunk indeksleri, iskelet sonluluğu, animasyon hareketi, zıplama/dash/koşu, saldırı isabeti, parçacık üretimi, 30 saniyelik soak testi) — hepsi CI'da koşuyor
+- CI: NDK/CMake tespiti, imzalı APK, `apksigner verify`
+
+### Kaldırıldı / arşiv
+- Web tabanlı APK artık `apk-web` etiketine, yalnızca manuel tetiklemeyle derleniyor
+
+---
+
 ## [0.2.0] — “Ustalık” — 2026-11-04
 
 Hareket ve dünya hissini derinleştiren sürüm: kaçınma, iniş saldırısı, fizikli nesneler ve dinamik hava.

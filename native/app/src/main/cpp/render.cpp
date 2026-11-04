@@ -258,8 +258,10 @@ bool Renderer::init() {
   resize(1, 1);
   glEnable(GL_DEPTH_TEST);
   glDepthFunc(GL_LESS);
-  glEnable(GL_CULL_FACE);
-  glCullFace(GL_BACK);
+  // Procedural geometry (tubes, canopies) does not guarantee consistent winding,
+  // so we render two-sided: missing faces would be a much worse bug than a few
+  // wasted triangles on a mobile GPU.
+  glDisable(GL_CULL_FACE);
   LOGI("renderer initialised");
   return true;
 }

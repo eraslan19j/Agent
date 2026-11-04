@@ -77,7 +77,7 @@ jobs:
 
       # Makes CI diagnostics readable from outside the runner (log downloads are not always reachable).
       - name: Publish build log
-        if: always()
+        if: failure()
         run: |
           set +e
           mkdir -p .ci
