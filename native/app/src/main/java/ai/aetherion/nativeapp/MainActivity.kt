@@ -108,7 +108,7 @@ class MainActivity : AppCompatActivity() {
         val w = dp(178f)
         for (i in 0 until 4) {
             val holder = FrameLayout(this)
-            val lp = LinearLayout.LayoutParams(w, ViewGroup.LayoutParams.MATCH_PARENT)
+            val lp = LinearLayout.LayoutParams(w.toInt(), ViewGroup.LayoutParams.MATCH_PARENT)
             lp.marginStart = (dp(11f)).toInt()
             lp.marginEnd = (dp(11f)).toInt()
             lp.topMargin = (dp(10f)).toInt()

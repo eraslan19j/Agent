@@ -236,7 +236,7 @@ class HudView @JvmOverloads constructor(
         for ((index, b) in buttons.withIndex()) {
             val pressed = pressedIndex == index
             val radius = b.r * if (pressed) 0.94f else 1f
-            val glowColor = if (b.main) 0x88FFC978 else 0x55FFFFFF
+            val glowColor = if (b.main) 0x88FFC978.toInt() else 0x55FFFFFF
 
             paint.shader = RadialGradient(
                 b.cx, b.cy, radius * 1.6f,
