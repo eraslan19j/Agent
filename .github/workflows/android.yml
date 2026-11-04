@@ -38,7 +38,7 @@ jobs:
         working-directory: game
         run: npx tsc --noEmit
 
-      - name: Logic tests
+      - name: Tests (logic + headless gameplay simulation)
         working-directory: game
         run: npm test
 
