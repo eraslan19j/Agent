@@ -4,7 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "esbuild tests/run.ts --bundle --platform=node --format=esm --outfile=.tmp/tests.mjs --log-level=error && node .tmp/tests.mjs"
+    "test": "npm run test:logic && npm run test:sim",
+    "test:logic": "esbuild tests/run.ts --bundle --platform=node --format=esm --outfile=.tmp/tests.mjs --log-level=error && node .tmp/tests.mjs",
+    "test:sim": "esbuild tests/sim.ts --bundle --platform=node --format=esm --outfile=.tmp/sim.mjs --log-level=error && node .tmp/sim.mjs"
   },
   "repository": {
     "type": "git",

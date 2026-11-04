@@ -90,8 +90,11 @@ export class Enemy {
     if (!this.alive || element === 'none') return resolveReaction(null, 'none');
     const reaction = resolveReaction(this.aura, element);
     // innate auras of elemental creatures always react
-    const innate = this.def.element !== 'none' && this.def.element !== element ? resolveReaction(this.def.element, element) : null;
-    const result = reaction.id !== 'none' ? reaction : (innate?.id !== 'none' ? innate! : reaction);
+    const innate = this.def.element !== 'none' && this.def.element !== element
+      ? resolveReaction(this.def.element, element)
+      : null;
+    let result = reaction;
+    if (result.id === 'none' && innate && innate.id !== 'none') result = innate;
     this.aura = nextAura(this.aura ?? (this.def.element !== element ? this.def.element : null), element, result);
     if (this.aura && this.aura !== 'none') this.auraTimer = 8;
     else this.aura = null;

@@ -72,7 +72,14 @@ export class Player {
   comboTimer = 0;
   busyTimer = 0;
   busyKind: 'skill' | 'burst' | null = null;
-  skillCd = 0;
+  /** Skill cooldowns are tracked per character (switching must not share them). */
+  readonly skillCds: Record<string, number> = {};
+  get skillCd() {
+    return this.skillCds[this.activeId] ?? 0;
+  }
+  set skillCd(v: number) {
+    this.skillCds[this.activeId] = v;
+  }
   switchCd = 0;
   hurtTimer = 0;
   footstepTimer = 0;
@@ -186,7 +193,9 @@ export class Player {
 
     if (this.switchCd > 0) this.switchCd -= dt;
     if (this.invuln > 0) this.invuln -= dt;
-    if (this.skillCd > 0) this.skillCd -= dt;
+    for (const id in this.skillCds) {
+      if (this.skillCds[id] > 0) this.skillCds[id] = Math.max(0, this.skillCds[id] - dt);
+    }
     if (this.comboTimer > 0) this.comboTimer -= dt;
     if (this.hurtTimer > 0) this.hurtTimer -= dt;
     if (this.shieldHp > 0) {

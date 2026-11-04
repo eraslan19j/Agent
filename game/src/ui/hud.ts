@@ -114,40 +114,47 @@ export class HUD {
   }
 
   private bindButtons() {
-    const acts: Record<string, string> = {
-      attack: 'attack', skill: 'skill', burst: 'burst', jump: 'jump',
-      sprint: 'sprint-special', interact: 'interact',
-    };
-    document.querySelectorAll<HTMLElement>('[data-act]').forEach((btn) => {
+    // IMPORTANT: scope to the HUD only — the main menu has its own data-act
+    // buttons and must keep native click behaviour.
+    document.querySelectorAll<HTMLElement>('#hud [data-act]').forEach((btn) => {
       const act = btn.dataset.act!;
+
+      // "sprint" is a held button, everything else is a tap action
+      if (act === 'sprint') {
+        const hold = (on: boolean) => {
+          this.ctx.input.sprintHeld = on;
+          btn.classList.toggle('press', on);
+          if (on) this.ctx.audio.resume();
+        };
+        btn.addEventListener('pointerdown', (e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          hold(true);
+        }, { passive: false });
+        const release = (e: Event) => {
+          e.stopPropagation();
+          hold(false);
+        };
+        btn.addEventListener('pointerup', release);
+        btn.addEventListener('pointercancel', release);
+        btn.addEventListener('pointerleave', release);
+        return;
+      }
+
       btn.addEventListener('pointerdown', (e) => {
         e.stopPropagation();
         e.preventDefault();
         this.ctx.audio.resume();
-        if (act === 'sprint-special') {
-          this.ctx.input.sprintHeld = true;
-          btn.classList.add('press');
-          return;
-        }
-        if (act === 'pause') {
-          this.ctx.events.emit('toast', { text: '__pause__' });
-          return;
-        }
+        if (act === 'pause') return; // handled by the game (opens the pause screen)
         this.ctx.input.press(act as any);
         this.ctx.audio.ui();
         btn.classList.add('press');
         setTimeout(() => btn.classList.remove('press'), 110);
       }, { passive: false });
-      if (act === 'sprint-special') {
-        const release = () => {
-          this.ctx.input.sprintHeld = false;
-          btn.classList.remove('press');
-        };
-        btn.addEventListener('pointerup', release);
-        btn.addEventListener('pointercancel', release);
-        btn.addEventListener('pointerleave', release);
-      }
     });
+
+    // pointer "tap to advance" hint removal
+    this.ctx.input.attach();
   }
 
   private bindTouch() {
