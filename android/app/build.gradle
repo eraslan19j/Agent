@@ -1,0 +1,79 @@
+// AETHERION — Android build
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'ai.aetherion.game'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "ai.aetherion.game"
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName "0.1.0"
+        resConfigs "tr", "en"
+    }
+
+    signingConfigs {
+        release {
+            // Dev/demo key committed on purpose so that every CI build is
+            // signed with the SAME certificate → APKs upgrade in place.
+            storeFile file("../keystore/aetherion-dev.jks")
+            storePassword "aetherion2026"
+            keyAlias "aetherion"
+            keyPassword "aetherion2026"
+            v1SigningEnabled true
+            v2SigningEnabled true
+        }
+    }
+
+    buildTypes {
+        debug {
+            applicationIdSuffix ".debug"
+            versionNameSuffix "-debug"
+        }
+        release {
+            minifyEnabled false
+            shrinkResources false
+            signingConfig signingConfigs.release
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    packaging {
+        resources.excludes += ['META-INF/*', 'META-INF/**']
+    }
+
+    lint {
+        abortOnError false
+        checkReleaseBuilds false
+    }
+
+    androidResources {
+        // the web bundle lives in assets/www and must not be compressed away
+        noCompress 'wasm'
+    }
+}
+
+// Copy the Vite production build into the APK assets before packaging.
+def webDist = file("$rootDir/../game/dist")
+def webTarget = layout.projectDirectory.dir("src/main/assets/www")
+
+tasks.register('copyWebAssets', Copy) {
+    onlyIf { webDist.exists() && new File(webDist, 'index.html').exists() }
+    from webDist
+    into webTarget
+}
+
+tasks.named('preBuild').configure { dependsOn 'copyWebAssets' }
+
+dependencies {
+    implementation 'androidx.webkit:webkit:1.11.0'
+}
