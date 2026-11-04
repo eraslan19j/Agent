@@ -79,12 +79,13 @@ jobs:
       - name: Publish build log
         if: always()
         run: |
+          set +e
           mkdir -p .ci
-          if [ -f /tmp/build.log ]; then cp /tmp/build.log .ci/last-build.log; else echo "no log" > .ci/last-build.log; fi
-          tail -70 .ci/last-build.log || true
+          if [ -f /tmp/build.log ]; then cp /tmp/build.log .ci/build.txt; else echo "no log" > .ci/build.txt; fi
+          tail -70 .ci/build.txt
           git config user.email "ci@aetherion.ai"
           git config user.name "Aetherion CI"
-          git add .ci/last-build.log
+          git add -f .ci/build.txt
           git commit -m "ci: native build log [skip ci]" || true
           git push origin "HEAD:${GITHUB_REF_NAME}" || echo "log push failed (non fatal)"
 
