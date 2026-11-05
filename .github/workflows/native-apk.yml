@@ -120,7 +120,7 @@ jobs:
         run: |
           gh release delete apk-latest --yes --cleanup-tag 2>/dev/null || true
           gh release create apk-latest out/Aetherion-Native-0.3.1.apk \
-            --title "AETHERION v0.3.0 NATIVE — APK (${GITHUB_SHA:0:7})" \
+            --title "AETHERION v0.3.1 NATIVE — APK (${GITHUB_SHA:0:7})" \
             --notes "**AETHERION v0.3.0 — Native (C++ / OpenGL ES 3 + Kotlin)** · $(git rev-parse --short HEAD)
 
           İlk native sürüm. WebView yok: render motoru C++ (NDK), arayüz Kotlin + Material 3.

@@ -437,6 +437,16 @@ struct FrameUniforms {
 
 void Renderer::frame(Game& g, float dt) {
   drawCalls_ = 0;
+  // never build matrices from a zero-sized surface: aspect becomes NaN and the
+  // whole frame collapses into a black screen
+  if (w_ < 2 || h_ < 2 || !sceneFbo_) {
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(0, 0, w_ > 0 ? w_ : 1, h_ > 0 ? h_ : 1);
+    glClearColor(0.10f, 0.06f, 0.12f, 1.f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    note("surface not ready (%dx%d fbo=%u)", w_, h_, (unsigned)sceneFbo_);
+    return;
+  }
   ensureChunks(g.player.pos);
 
   // ---- camera matrices ----
@@ -516,7 +526,7 @@ void Renderer::frame(Game& g, float dt) {
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
   // sky
-  {
+  if (sky_.id) {
     Vec3 fwd = (g.camTarget - camPos).norm();
     Vec3 right = fwd.cross(Vec3(0, 1, 0)).norm();
     Vec3 up = right.cross(fwd).norm();
