@@ -76,6 +76,30 @@ GLint GlProgram::u(const char* name) {
   return loc;
 }
 
+// Assembles a shader source with exactly one leading "#version 300 es".
+// Every source string in shaders.h already carries the directive, and merged
+// fragments prepend it again - a duplicated #version makes the driver reject the
+// whole program, which is what produced the black screen.
+std::string shSrc(const std::string& raw) {
+  std::string out;
+  out.reserve(raw.size() + 32);
+  out += "#version 300 es\n";
+  size_t i = 0;
+  while (i < raw.size()) {
+    size_t e = raw.find('\n', i);
+    if (e == std::string::npos) e = raw.size();
+    size_t t = i;
+    while (t < e && (raw[t] == ' ' || raw[t] == '\t')) t++;
+    const bool isVersion = (e - t >= 8) && raw.compare(t, 8, "#version") == 0;
+    if (!isVersion) {
+      out.append(raw, i, e - i);
+      out += '\n';
+    }
+    i = e + 1;
+  }
+  return out;
+}
+
 // ---------------------------------------------------------------- shader build
 namespace {
 bool buildProgram(GlProgram& p, const std::string& vs, const std::string& fs, const char* label) {
@@ -133,7 +157,7 @@ bool Renderer::init() {
 
   auto build = [&](GlProgram& prog, const std::string& vs, const std::string& fs, const char* label) {
     g_errSink[0] = 0;
-    if (buildProgram(prog, vs, fs, label)) return true;
+    if (buildProgram(prog, shSrc(vs), shSrc(fs), label)) return true;
     note("%s: %s", label, g_errSink[0] ? g_errSink : "shader compile/link failed");
     return false;
   };

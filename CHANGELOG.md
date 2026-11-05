@@ -8,7 +8,8 @@ Tüm önemli değişiklikler bu dosyada tutulur. Biçim: [Keep a Changelog](http
 
 **Bloklayıcı hata düzeltildi: 0.3.0 kurulduğunda oyun siyah ekran veriyordu.**
 
-### Düzeltildi — renderer
+### Düzeltildi — renderer (kök neden)
+- **Shader kaynaklarında çift `#version 300 es`**: `shaders.h` içindeki her kaynak kendi `#version` satırını taşıyor, `render.cpp` başına bir tane daha ekliyordu. GLSL ES 3.00'da ikinci `#version` derleme hatasıdır → **11 programın tamamı derlenemiyordu** → `init()` başarısız → tam siyah ekran. Artık `shSrc()` tüm `#version` satırlarını süzüp başa tek bir tane koyuyor.
 - Gölge geçişi artık **yalnız derinlik** yazan özel programlarla (`DEPTH_VS`, `DEPTH_SKIN_VS`, `DEPTH_FS`) çiziliyor; gölge haritası çizilirken aynı doku örneklenmiyordu (sampler feedback → tanımsız/boş kare riski kalktı)
 - Gölge FBO tamamlanmazsa renderer **ölüyordu**; artık gölgeler kapanıp sahne çizilmeye devam ediyor (`shadowEnabled_`)
 - Gölge derinlik dokusunda geçersiz `GL_TEXTURE_COMPARE_MODE = GL_NEAREST` parametresi ve `LINEAR` filtresi kaldırıldı (`NEAREST`)
