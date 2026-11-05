@@ -1,19 +1,15 @@
 package ai.aetherion.nativeapp
 
 /**
- * Bridge to the C++ engine.
- *
- * Every native entry point is prefixed with `n` and wrapped here, so a missing or
- * broken native library degrades into a readable on-screen diagnostic instead of
- * killing the app with an UnsatisfiedLinkError.
+ * Bridge to the C++ block engine. Every native call is wrapped so a broken or
+ * missing library can never crash the app — it just reports "not ready".
  */
 object Engine {
 
     var loadError: String? = null
         private set
 
-    val loaded: Boolean
-        get() = loadError == null
+    val loaded: Boolean get() = loadError == null
 
     init {
         try {
@@ -23,17 +19,14 @@ object Engine {
         }
     }
 
-    // ---- raw entry points (jni.cpp) ----
     private external fun nCreate()
     private external fun nResize(w: Int, h: Int)
     private external fun nFrame(dt: Float)
     private external fun nSetMove(x: Float, y: Float)
     private external fun nLook(dx: Float, dy: Float)
+    private external fun nJump()
     private external fun nSetSprint(on: Boolean)
-    private external fun nAction(code: Int)
-    private external fun nSetCharacter(id: Int)
-    private external fun nSetBrightness(b: Float)
-    private external fun nSetQuality(level: Int)
+    private external fun nSetSensitivity(s: Float)
     private external fun nReset()
     private external fun nState(): FloatArray
     private external fun nGlInfo(): String
@@ -41,7 +34,6 @@ object Engine {
     private external fun nReady(): Boolean
     private external fun nDestroy()
 
-    // ---- safe wrappers ----
     private fun <T> guard(fallback: T, block: () -> T): T {
         if (!loaded) return fallback
         return try {
@@ -56,11 +48,9 @@ object Engine {
     fun frame(dt: Float) = guard(Unit) { nFrame(dt) }
     fun setMove(x: Float, y: Float) = guard(Unit) { nSetMove(x, y) }
     fun look(dx: Float, dy: Float) = guard(Unit) { nLook(dx, dy) }
+    fun jump() = guard(Unit) { nJump() }
     fun setSprint(on: Boolean) = guard(Unit) { nSetSprint(on) }
-    fun action(code: Int) = guard(Unit) { nAction(code) }
-    fun setCharacter(id: Int) = guard(Unit) { nSetCharacter(id) }
-    fun setBrightness(b: Float) = guard(Unit) { nSetBrightness(b) }
-    fun setQuality(level: Int) = guard(Unit) { nSetQuality(level) }
+    fun setSensitivity(s: Float) = guard(Unit) { nSetSensitivity(s) }
     fun reset() = guard(Unit) { nReset() }
     fun state(): FloatArray = guard(FloatArray(10)) { nState() }
     fun glInfo(): String = guard("motor yüklenemedi") { nGlInfo() }
@@ -68,9 +58,14 @@ object Engine {
     fun ready(): Boolean = guard(false) { nReady() }
     fun destroy() = guard(Unit) { nDestroy() }
 
-    // action codes (must match jni.cpp)
-    const val ACT_ATTACK = 0
-    const val ACT_SKILL = 1
-    const val ACT_DASH = 2
-    const val ACT_JUMP = 3
+    // state indices
+    const val S_COINS = 0
+    const val S_TOTAL = 1
+    const val S_TIME = 2
+    const val S_X = 3
+    const val S_Y = 4
+    const val S_Z = 5
+    const val S_WON = 6
+    const val S_RESPAWNS = 7
+    const val S_GROUNDED = 9
 }

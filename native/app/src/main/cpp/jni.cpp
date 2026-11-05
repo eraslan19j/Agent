@@ -1,21 +1,18 @@
 // ============================================================
-// AETHERION NATIVE — JNI bridge (Kotlin ⇄ C++)
+// AETHERION BLOX — JNI bridge
 // ============================================================
 #include <jni.h>
-#include <GLES3/gl3.h>
-#include <android/log.h>
+
 #include <cmath>
+
 #include "game.h"
 #include "render.h"
 
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "AetherionJNI", __VA_ARGS__)
-#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "AetherionJNI", __VA_ARGS__)
-
 namespace {
-ae::Renderer* gRenderer = nullptr;
-ae::Game* gGame = nullptr;
+blox::Game* gGame = nullptr;
+blox::Renderer* gRenderer = nullptr;
 bool gReady = false;
-float gBrightness = 1.0f;
+float gSensitivity = 1.0f;
 }  // namespace
 
 extern "C" {
@@ -23,17 +20,12 @@ extern "C" {
 JNIEXPORT void JNICALL
 Java_ai_aetherion_nativeapp_Engine_nCreate(JNIEnv*, jclass) {
   if (!gGame) {
-    gGame = &ae::gameInstance();
+    gGame = &blox::instance();
     gGame->reset();
   }
   if (!gRenderer) {
-    gRenderer = new ae::Renderer();
+    gRenderer = new blox::Renderer();
     gReady = gRenderer->init() && gRenderer->ready();
-    if (!gReady) {
-      LOGE("renderer init failed: %s", gRenderer->lastError());
-      gRenderer->note("init failed");
-    }
-    LOGI("engine created (%s)", gReady ? "ok" : "FAILED");
   }
 }
 
@@ -44,13 +36,7 @@ Java_ai_aetherion_nativeapp_Engine_nResize(JNIEnv*, jclass, jint w, jint h) {
 
 JNIEXPORT void JNICALL
 Java_ai_aetherion_nativeapp_Engine_nFrame(JNIEnv*, jclass, jfloat dt) {
-  if (!gGame || !gRenderer || !gReady) {
-    // visible "engine not ready" colour instead of an unexplained black screen
-    glClearColor(0.10f, 0.06f, 0.12f, 1.f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    return;
-  }
-  gGame->brightness = gBrightness;
+  if (!gGame || !gRenderer || !gReady) return;
   gGame->update(dt);
   gRenderer->frame(*gGame, dt);
 }
@@ -58,47 +44,36 @@ Java_ai_aetherion_nativeapp_Engine_nFrame(JNIEnv*, jclass, jfloat dt) {
 JNIEXPORT void JNICALL
 Java_ai_aetherion_nativeapp_Engine_nSetMove(JNIEnv*, jclass, jfloat x, jfloat y) {
   if (!gGame) return;
-  gGame->moveX = x;
-  gGame->moveY = y;
+  // x = strafe (right positive), y = forward (up on the stick positive)
+  gGame->moveX = x > 1.f ? 1.f : (x < -1.f ? -1.f : x);
+  gGame->moveY = y > 1.f ? 1.f : (y < -1.f ? -1.f : y);
 }
 
 JNIEXPORT void JNICALL
 Java_ai_aetherion_nativeapp_Engine_nLook(JNIEnv*, jclass, jfloat dx, jfloat dy) {
   if (!gGame) return;
-  gGame->lookDX += dx;
-  gGame->lookDY += dy;
+  gGame->camYaw -= dx * 0.006f * gSensitivity;
+  gGame->camPitch += dy * 0.004f * gSensitivity;
+  const float lo = -0.25f, hi = 1.15f;
+  if (gGame->camPitch < lo) gGame->camPitch = lo;
+  if (gGame->camPitch > hi) gGame->camPitch = hi;
+  while (gGame->camYaw > blox::PI) gGame->camYaw -= 2.f * blox::PI;
+  while (gGame->camYaw < -blox::PI) gGame->camYaw += 2.f * blox::PI;
+}
+
+JNIEXPORT void JNICALL
+Java_ai_aetherion_nativeapp_Engine_nJump(JNIEnv*, jclass) {
+  if (gGame) gGame->jump();
 }
 
 JNIEXPORT void JNICALL
 Java_ai_aetherion_nativeapp_Engine_nSetSprint(JNIEnv*, jclass, jboolean on) {
-  if (gGame) gGame->sprinting = on;
+  if (gGame) gGame->sprint = on == JNI_TRUE;
 }
 
 JNIEXPORT void JNICALL
-Java_ai_aetherion_nativeapp_Engine_nAction(JNIEnv*, jclass, jint code) {
-  if (!gGame) return;
-  switch (code) {
-    case 0: gGame->wantAttack = true; break;   // attack
-    case 1: gGame->wantSkill = true; break;    // element skill
-    case 2: gGame->wantDash = true; break;     // dash
-    case 3: gGame->wantJump = true; break;     // jump / glide
-    default: break;
-  }
-}
-
-JNIEXPORT void JNICALL
-Java_ai_aetherion_nativeapp_Engine_nSetCharacter(JNIEnv*, jclass, jint id) {
-  if (gGame) gGame->setCharacter((int)id);
-}
-
-JNIEXPORT void JNICALL
-Java_ai_aetherion_nativeapp_Engine_nSetBrightness(JNIEnv*, jclass, jfloat b) {
-  gBrightness = b;
-}
-
-JNIEXPORT void JNICALL
-Java_ai_aetherion_nativeapp_Engine_nSetQuality(JNIEnv*, jclass, jint level) {
-  (void)level;   // reserved: chunk radius / shadow res scaling
+Java_ai_aetherion_nativeapp_Engine_nSetSensitivity(JNIEnv*, jclass, jfloat s) {
+  gSensitivity = s < 0.2f ? 0.2f : (s > 2.5f ? 2.5f : s);
 }
 
 JNIEXPORT void JNICALL
@@ -112,19 +87,16 @@ Java_ai_aetherion_nativeapp_Engine_nState(JNIEnv* env, jclass) {
   if (!arr) return nullptr;
   float v[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
   if (gGame) {
-    int alive = 0;
-    for (const auto& e : gGame->enemies)
-      if (e.alive) alive++;
-    v[0] = gGame->player.hp;
-    v[1] = gGame->player.maxHp;
-    v[2] = gGame->stamina;
-    v[3] = gGame->energy;
-    v[4] = (float)gGame->character;
-    v[5] = gGame->player.pos.x;
-    v[6] = gGame->player.pos.z;
-    v[7] = (float)alive;
-    v[8] = gGame->skillCd;
-    v[9] = gGame->dashCd;
+    v[0] = (float)gGame->collected;
+    v[1] = (float)gGame->coins.size();
+    v[2] = gGame->time;
+    v[3] = gGame->player.pos.x;
+    v[4] = gGame->player.pos.y;
+    v[5] = gGame->player.pos.z;
+    v[6] = gGame->won ? 1.f : 0.f;
+    v[7] = (float)gGame->respawns;
+    v[8] = gGame->respawnFlash;
+    v[9] = gGame->player.grounded ? 1.f : 0.f;
   }
   env->SetFloatArrayRegion(arr, 0, 10, v);
   return arr;
@@ -132,13 +104,13 @@ Java_ai_aetherion_nativeapp_Engine_nState(JNIEnv* env, jclass) {
 
 JNIEXPORT jstring JNICALL
 Java_ai_aetherion_nativeapp_Engine_nGlInfo(JNIEnv* env, jclass) {
-  const char* info = gRenderer ? gRenderer->glInfo() : "renderer not ready";
+  const char* info = gRenderer ? gRenderer->glInfo() : "motor hazır değil";
   return env->NewStringUTF(info);
 }
 
 JNIEXPORT jstring JNICALL
 Java_ai_aetherion_nativeapp_Engine_nLastError(JNIEnv* env, jclass) {
-  const char* msg = gRenderer ? gRenderer->lastError() : "renderer not created";
+  const char* msg = gRenderer ? gRenderer->lastError() : "renderer oluşturulmadı";
   return env->NewStringUTF(msg && msg[0] ? msg : "");
 }
 

@@ -4,6 +4,36 @@ Tüm önemli değişiklikler bu dosyada tutulur. Biçim: [Keep a Changelog](http
 
 ---
 
+## [1.0.0] — "BLOX" (SIFIRDAN YENİDEN YAZIM) — 2026-11-06
+
+**Eski proje tamamen silindi.** Açık dünya RPG motoru, WebView sürümü, gölge/HDR/bloom hattı,
+dokümanlar ve eski CI akışı kaldırıldı. Yeni oyun: Roblox tarzı blok oyunu.
+
+### Eklendi
+- **C++17 çekirdek** (`game.h/game.cpp`): blok dünya üretimi, AABB çarpışma, yerçekimi,
+  zıplama, otomatik basamak çıkma (0.62 m), zıplama pedi, yeniden doğma, para toplama, süre
+- **Dünya:** çimen platform (3.2 m dama deseni), spawn meydanı, 9 basamaklı merdiven,
+  dar köprü, 2 yüzen ada, 4 basamak taşı, tepe kulesi, 20 altın, dekoratif bloklar
+- **Renderer** (`render.h/render.cpp`): OpenGL ES 2.0, tek shader programı, tek statik dünya
+  tamponu (tek `glDrawArrays`), tek küp tamponu, yüz ışığı vertex rengine pişirilmiş
+- **Blok karakter:** gövde/kollar/bacaklar/kafa + gözler ve gülümseme; yürüme salınımı,
+  zıplama pozu, boşta nefes alma
+- **Kotlin arayüz:** menü, oyun içi altın/süre paneli, kazanma ekranı, joystick + ZIPLA
+- **CI:** 29 host testi + NDK derlemesi + imza doğrulama + `apk-latest` sürümü
+  (`Aetherion-Blox-1.0.0.apk`)
+
+### Kaldırıldı
+- `game/` (WebView/three.js), `android/` (eski Java istemci), `docs/`, eski `.ci/`
+- Gölge haritası, HDR, bloom, post-process, iskeletli skinning, element sistemi, chunk dünyası
+  — bunlar siyah ekranın kaynağıydı ve yeni oyunun kapsamı dışında
+
+### Düzeltildi
+- Joystick yönü: **sağa itilen joystick karakteri sağa götürür** (testli)
+- Motor başlamazsa menüde hata metni görünür; sessiz siyah ekran kalmaz
+- İmza anahtarı `signing/` altına taşındı (uygulama kimliği korundu, üzerine kurulabilir)
+
+---
+
 ## [0.3.1] — "Siyah Ekran Hotfix" (NATIVE) — 2026-11-05
 
 **Bloklayıcı hata düzeltildi: 0.3.0 kurulduğunda oyun siyah ekran veriyordu.**

@@ -1,8 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="deep_night">#FF070A12</color>
-    <color name="mid_night">#FF0E1522</color>
-    <color name="gold">#FFE8C983</color>
-    <color name="aether">#FF6FE8C4</color>
-    <color name="text_dim">#99C9D4E3</color>
+    <color name="blox_sky">#FF6FC3F2</color>
+    <color name="blox_sky_deep">#FF3E9BD6</color>
+    <color name="blox_blue">#FF2F7DE1</color>
+    <color name="blox_blue_dark">#FF1E5CB4</color>
+    <color name="blox_gold">#FFFFC531</color>
+    <color name="blox_green">#FF3FAE4A</color>
+    <color name="blox_text">#FF152230</color>
+    <color name="blox_dim">#B3EAF6FF</color>
+    <color name="blox_shadow">#33000000</color>
+    <color name="deep_night">#FF0C1A2A</color>
+    <color name="gold">#FFFFC531</color>
+    <color name="aether">#FF38C6F4</color>
+    <color name="text_dim">#B3FFFFFF</color>
+    <color name="white">#FFFFFFFF</color>
 </resources>

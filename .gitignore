@@ -1,12 +1,8 @@
-# dependencies & build output
-node_modules/
-dist/
-game/dist/
-android/app/src/main/assets/www/
-android/.gradle/
-android/build/
-android/app/build/
-android/local.properties
+# build output
+native/.gradle/
+native/build/
+native/app/build/
+native/local.properties
 *.iml
 .idea/
 .DS_Store
@@ -15,5 +11,5 @@ android/local.properties
 *.log
 *.apk
 *.aab
-!android/keystore/*.jks
 .tmp/
+.ci/

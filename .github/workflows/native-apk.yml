@@ -103,14 +103,14 @@ jobs:
         run: |
           mkdir -p out
           APK=$(find native/app/build/outputs/apk/release -name '*.apk' | head -1)
-          cp "$APK" out/Aetherion-Native-0.3.1.apk
+          cp "$APK" out/Aetherion-Blox-1.0.0.apk
           ls -lh out
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Aetherion-Native-APK
-          path: out/Aetherion-Native-0.3.1.apk
+          name: Aetherion-Blox-APK
+          path: out/Aetherion-Blox-1.0.0.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -119,24 +119,30 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release delete apk-latest --yes --cleanup-tag 2>/dev/null || true
-          gh release create apk-latest out/Aetherion-Native-0.3.1.apk \
-            --title "AETHERION v0.3.1 NATIVE — APK (${GITHUB_SHA:0:7})" \
-            --notes "**AETHERION v0.3.0 — Native (C++ / OpenGL ES 3 + Kotlin)** · $(git rev-parse --short HEAD)
+          cat > /tmp/notes.md <<'NOTES'
+          **AETHERION BLOX v1.0.0 — Roblox tarzı blok oyunu**
 
-          İlk native sürüm. WebView yok: render motoru C++ (NDK), arayüz Kotlin + Material 3.
+          Eski motor **tamamen silindi**, oyun sıfırdan yazıldı. Tek shader, tek dünya tamponu;
+          FBO / gölge haritası / HDR / bloom / post-process **yok** — siyah ekran üreten katmanlar kalmadı.
+          Renderer doğrudan arka tampona çiziyor (OpenGL ES 2.0).
 
-          **Kurulum:** APK'yı indir → 'bilinmeyen kaynaklara izin ver' → kur → yatay aç.
+          **Kurulum:** APK'yı indir → "bilinmeyen kaynaklara izin ver" → kur → yatay aç → OYNA.
 
-          ### Yeni
-          - C++/OpenGL ES 3 renderer: gölge haritası, HDR + bloom, ACES ton eşleme, rim/cel aydınlatma, sis, su shader'ı
-          - Prosedürel açık dünya: 96 m'lik chunk'lar, 5x5 akış, ağaç/kaya örnekleme
-          - İskeletli karakter: 21 kemik, GPU skinning, 13 animasyon durumu (koşu, sprint, zıplama, süzülme, 3'lü kombo, yetenek, dash, hasar, ölüm)
-          - Parçacık VFX + kılıç izi + hit-stop + kamera sarsıntısı
-          - Material 3 arayüz: karakter seçim ekranı (element auraları, kart animasyonları), ayarlar
-          - **Joystick düzeltmesi:** ekran yukarısı artık ileri; joystick sağ/sol seçilebilir (Genshin'de sol)
+          ### Oyun
+          - Blok dünya: çimen platform, 20 altın, merdiven, dar köprü, yüzen adalar, tepe kulesi
+          - Roblox tarzı blok karakter: gövde / kol / bacak / kafa, yürüme + zıplama animasyonu, gözler
+          - Fizik: yerçekimi, zıplama, otomatik basamak çıkma, AABB çarpışma, zıplama pedi
+          - Boşluğa düşünce yeniden doğma, süre sayacı, tüm altınları toplayınca kazanma ekranı
+          - Kontroller: sol joystick (sağa = sağa), ZIPLA butonu, ekranı sürükle = kamera
 
-          ### Bilinen eksikler (v0.4)
-          - Düşman çeşitliliği ve boss
-          - Gerçek glTF karakter modelleri (şu an prosedürel iskelet)
-          - Envanter/görev arayüzleri" \
+          ### Teknik
+          - C++17 çekirdek (dünya + fizik, GL içermez → CI'da 29 host testi)
+          - Kotlin + Material 3 arayüz, mobil yatay kilit
+          - OpenGL ES 2.0, tek program, statik dünya tek draw call
+          - Teşhis: motor başlamazsa menüde hata metni görünür (sessiz siyah ekran yok)
+          NOTES
+          sed -i 's/^          //' /tmp/notes.md
+          gh release create apk-latest out/Aetherion-Blox-1.0.0.apk \
+            --title "AETHERION BLOX v1.0.0 — APK (${GITHUB_SHA:0:7})" \
+            --notes-file /tmp/notes.md \
             --latest

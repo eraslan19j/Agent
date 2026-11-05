@@ -10,5 +10,5 @@ add_library(aetherion SHARED
     jni.cpp
 )
 
-target_compile_options(aetherion PRIVATE -O2 -ffast-math -fno-exceptions -fno-rtti -Wall)
-target_link_libraries(aetherion PRIVATE GLESv3 log android)
+target_compile_options(aetherion PRIVATE -O2 -fno-exceptions -fno-rtti -Wall)
+target_link_libraries(aetherion PRIVATE GLESv2 log android)

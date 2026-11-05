@@ -1,268 +1,155 @@
 // ============================================================
-// AETHERION NATIVE — simulation core (terrain, characters, combat)
-// Pure CPU: no GL calls here, so it can be unit-tested on a host.
+// AETHERION BLOX — blocky sandbox core (pure C++, no GL here)
 // ============================================================
 #pragma once
+#include <cmath>
 #include <cstdint>
 #include <vector>
-#include <string>
-#include "m3d.h"
 
-namespace ae {
+namespace blox {
 
-using m3::Vec3;
-using m3::Mat4;
+constexpr float PI = 3.14159265358979f;
 
-// ---------------------------------------------------------------- bones
-enum BoneId {
-  B_ROOT = 0, B_HIPS, B_SPINE, B_CHEST, B_NECK, B_HEAD,
-  B_SHOULDER_L, B_ARM_L, B_FOREARM_L, B_HAND_L,
-  B_SHOULDER_R, B_ARM_R, B_FOREARM_R, B_HAND_R,
-  B_THIGH_L, B_SHIN_L, B_FOOT_L,
-  B_THIGH_R, B_SHIN_R, B_FOOT_R,
-  B_WEAPON,
-  BONE_COUNT
+struct Vec3 {
+  float x = 0, y = 0, z = 0;
+  Vec3() = default;
+  Vec3(float a, float b, float c) : x(a), y(b), z(c) {}
+  Vec3 operator+(const Vec3& o) const { return Vec3(x + o.x, y + o.y, z + o.z); }
+  Vec3 operator-(const Vec3& o) const { return Vec3(x - o.x, y - o.y, z - o.z); }
+  Vec3 operator*(float s) const { return Vec3(x * s, y * s, z * s); }
+  Vec3& operator+=(const Vec3& o) { x += o.x; y += o.y; z += o.z; return *this; }
+  float dot(const Vec3& o) const { return x * o.x + y * o.y + z * o.z; }
+  Vec3 cross(const Vec3& o) const {
+    return Vec3(y * o.z - z * o.y, z * o.x - x * o.z, x * o.y - y * o.x);
+  }
+  float len() const { return std::sqrt(dot(*this)); }
+  Vec3 norm() const { float l = len(); return l > 1e-6f ? (*this) * (1.f / l) : Vec3(0, 0, 0); }
 };
 
-struct Pose {
-  float rot[BONE_COUNT][3];   // euler XYZ per bone (radians, relative to rest)
-  Vec3 rootOffset;            // hip translation (bob / lean)
-  float scaleHint = 0.f;      // reserved
-  Pose();
-  static void blend(const Pose& a, const Pose& b, float t, Pose& out);
+// column-major 4x4
+struct Mat4 {
+  float m[16];
+  Mat4() { identity(); }
+  void identity() {
+    for (int i = 0; i < 16; i++) m[i] = (i % 5 == 0) ? 1.f : 0.f;
+  }
 };
 
-struct SkinnedVertex {
-  float px, py, pz;
-  float nx, ny, nz;
-  float cr, cg, cb;
-  uint8_t j0, j1;
-  uint8_t w0, pad;
+Mat4 mul(const Mat4& a, const Mat4& b);
+Mat4 perspective(float fovyRad, float aspect, float zn, float zf);
+Mat4 lookAt(const Vec3& eye, const Vec3& center, const Vec3& up);
+Mat4 translate(const Vec3& t);
+Mat4 scaleV(const Vec3& s);
+Mat4 rotateX(float a);
+Mat4 rotateY(float a);
+
+struct Vertex {
+  float x, y, z;
+  float r, g, b;
 };
 
-struct MeshData {
-  std::vector<SkinnedVertex> verts;
-  std::vector<uint16_t> idx;
+struct Box {
+  Vec3 c;              // centre
+  Vec3 h;              // half extents
+  Vec3 col;
+  bool solid = true;
+  bool pad = false;    // jump pad
 };
 
-struct CharModel {
-  MeshData mesh;
-  Mat4 bindInv[BONE_COUNT];
-  Mat4 restLocal[BONE_COUNT];
-  int parent[BONE_COUNT];
-  bool built = false;
-};
-
-/** Builds the shared humanoid mesh + skeleton (identical for every character). */
-void buildCharacterModel(CharModel& out);
-/** Computes bone matrices for a pose; returns the bone palette for skinning. */
-void poseToMatrices(const CharModel& model, const Pose& pose, const Vec3& worldPos, float yaw, float scale, Mat4 out[BONE_COUNT]);
-
-// ---------------------------------------------------------------- animation
-enum AnimState {
-  A_IDLE = 0, A_RUN, A_SPRINT, A_JUMP, A_FALL, A_GLIDE,
-  A_ATTACK1, A_ATTACK2, A_ATTACK3, A_SKILL, A_DASH, A_HIT, A_DEAD, A_STATE_COUNT
-};
-
-struct AnimPlayer {
-  AnimState state = A_IDLE;
-  float time = 0;
-  float blend = 1.f;          // 0..1 blend-in weight
-  AnimState prevState = A_IDLE;
-  float prevTime = 0;
-  float speed = 1.f;
-  void play(AnimState s, float startTime = 0.f);
-  void update(float dt);
-  /** Samples the pose for the current state, cross-fading with the previous one. */
-  void sample(Pose& out) const;
-};
-
-/** Straight-ahead run/idle/etc. curve functions (also used by tests). */
-void samplePose(AnimState state, float t, float speedScale, Pose& out);
-float animDuration(AnimState s);
-
-// ---------------------------------------------------------------- terrain
-struct Terrain {
-  static float heightAt(float x, float z);
-  static Vec3 normalAt(float x, float z);
-  static Vec3 colorAt(float x, float z, float height, const Vec3& n);
-  static bool isWater(float x, float z);
-  static constexpr float WATER_LEVEL = 0.f;
-  static constexpr float HALF = 720.f;
-};
-
-// ---------------------------------------------------------------- world props
-struct TreeInstance { Vec3 pos; float height; float radius; float hue; };
-struct RockInstance { Vec3 pos; float size; float yaw; };
-
-struct TerrainVertex {
-  float px, py, pz;
-  float nx, ny, nz;
-  float cr, cg, cb;
-};
-
-struct Chunk {
-  int cx = 0, cz = 0;
-  bool ready = false;
-  std::vector<TerrainVertex> verts;
-  std::vector<uint16_t> idx;
-  std::vector<TreeInstance> trees;
-  std::vector<RockInstance> rocks;
-};
-
-// ---------------------------------------------------------------- particles
-struct Particle {
-  Vec3 pos, vel;
-  float life = 0, maxLife = 1;
-  float size = 0.2f;
-  Vec3 color;
-  float gravity = -6.f;
-  float drag = 1.5f;
-  bool additive = true;
-  bool alive = false;
-};
-
-struct TrailPoint { Vec3 a, b; float t; bool valid; };
-
-// ---------------------------------------------------------------- entities
-struct Entity {
+struct Coin {
   Vec3 pos;
+  bool taken = false;
+};
+
+struct Player {
+  Vec3 pos;            // feet centre
   Vec3 vel;
-  float yaw = 0;
-  float hp = 100, maxHp = 100;
-  float radius = 0.45f;
-  bool alive = true;
-  float hurtFlash = 0;
-  float scale = 1.f;
-  Vec3 baseColor{0.9f, 0.75f, 0.55f};   // skin/cloth tint
-  Vec3 accentColor{0.35f, 0.55f, 0.9f};
-  AnimPlayer anim;
+  float yaw = 0.f;
+  bool grounded = false;
+  float walkPhase = 0.f;
+  float jumpBuffer = 0.f;
+  float airTime = 0.f;
 };
-
-struct Enemy : Entity {
-  float attackCd = 0;
-  float telegraph = 0;
-  float aggro = 0;
-  int kind = 0;          // 0 melee, 1 ranged
-  Vec3 spawn;
-};
-
-struct CombatEvent {
-  Vec3 pos;
-  float amount;
-  bool crit;
-  int element;           // 0 none, 1 anemo, 2 pyro, 3 electro, 4 cryo
-};
-
-// ---------------------------------------------------------------- game
-enum ElementId { EL_NONE = 0, EL_ANEMO, EL_PYRO, EL_ELECTRO, EL_CRYO };
-
-struct CharacterDef {
-  const char* name;
-  int element;
-  Vec3 clothColor;
-  Vec3 accent;
-  float atk;
-  float speed;
-  const char* weapon;    // "sword" | "catalyst" | "polearm" | "claymore"
-};
-
-extern const CharacterDef CHARACTERS[4];
-extern const Vec3 ELEMENT_COLORS[5];
 
 struct Game {
-  // player
-  Entity player;
-  int character = 0;
-  float stamina = 100, staminaMax = 100;
-  float energy = 0, energyMax = 100;
-  bool grounded = true, gliding = false, sprinting = false;
-  float attackTimer = 0, attackDur = 0.42f, attackHitAt = 0.34f, comboTimer = 0;
-  int comboIndex = 0;
-  bool attackHitDone = false, attackQueued = false;
-  float dashTimer = 0, dashCd = 0, invuln = 0, skillCd = 0;
-  bool plunging = false;
-  Vec3 dashDir;
-  float footstepTimer = 0;
+  // world
+  std::vector<Box> solids;     // colliders
+  std::vector<Box> pads;
+  std::vector<Vertex> world;   // baked static mesh
+  std::vector<Coin> coins;
 
-  // camera
-  Vec3 camPos, camTarget;
-  float camYaw = 0, camPitch = 0.22f, camDist = 5.4f;
+  Player player;
+  Vec3 spawn;
+
+  // camera (orbit)
+  float camYaw = 0.f;
+  float camPitch = 0.30f;
+  float camDist = 6.4f;
 
   // input
-  float moveX = 0, moveY = 0;
-  float lookDX = 0, lookDY = 0;
-  bool wantJump = false, wantAttack = false, wantSkill = false, wantDash = false;
+  float moveX = 0.f;
+  float moveY = 0.f;
+  bool sprint = false;
 
-  // world
-  std::vector<Enemy> enemies;
-  std::vector<Particle> particles;
-  TrailPoint trail[24];
-  int trailHead = 0;
-  float timeSeconds = 0;
-  float dayTime = 0.34f;       // 0..1 (0.25 = sunrise, 0.5 = noon)
-  Vec3 sunDir{0.4f, 0.85f, 0.3f};
-  Vec3 sunColor{1.f, 0.95f, 0.86f};
-  float sunIntensity = 3.1f;
-  Vec3 skyTop{0.22f, 0.42f, 0.74f}, skyHorizon{0.72f, 0.83f, 0.92f};
-  Vec3 fogColor{0.68f, 0.79f, 0.88f};
-  float fogDensity = 0.0042f;
-  float exposure = 1.0f;
-  float brightness = 1.0f;     // user setting
-  float shake = 0.f;
-  float hitStop = 0.f;
-  float damageFlash = 0.f;
-  Vec3 hitDir{0, 0, 1};
-  int hitCount = 0;
+  // run state
+  float time = 0.f;
+  int collected = 0;
+  bool won = false;
+  int respawns = 0;
+  float respawnFlash = 0.f;
+  float coinSpin = 0.f;
+  float bob = 0.f;
 
+  void build();
   void reset();
-  void spawnEnemies();
-  void setCharacter(int id);
+  void jump();
   void update(float dt);
-  void updateCamera(float dt);
-  void updatePlayer(float dt);
-  void updateEnemies(float dt);
-  void updateParticles(float dt);
-  void updateSky(float dt);
 
-  void startAttack();
-  void performHit();
-  void doDash();
-  void useSkill();
-  void plungeImpact();
-  void emit(Vec3 pos, Vec3 vel, float life, float size, Vec3 color, float gravity, bool additive);
-  void burst(Vec3 pos, int count, Vec3 color, float speed, float life, float gravity, bool additive);
-  void addTrailPoint(Vec3 a, Vec3 b);
+  Vec3 camFwd() const;
+  Vec3 camRight() const;
+  Vec3 camEye() const;
+  Vec3 camTarget() const;
 
-  const CharacterDef& def() const { return CHARACTERS[character]; }
-  float atk() const { return def().atk; }
-  Vec3 elementColor() const { return ELEMENT_COLORS[def().element]; }
+  void addBox(const Vec3& c, const Vec3& h, const Vec3& col, bool solid,
+              bool pad = false);
+  void addFlat(const Vec3& c, const Vec3& h, const Vec3& col);  // top-face only tile
+  void addStairs(const Vec3& base, int steps, float rise, float run, float width,
+                 const Vec3& col, int axis);                 // axis: -1 = -Z, +1 = +Z, 2 = +X
+  void addCoin(const Vec3& p);
+  void bakeBoxFaces(const Vec3& c, const Vec3& h, const Vec3& col);
 };
 
-Game& gameInstance();
+Game& instance();
 
-// deterministic RNG for reproducible worlds
-struct Rng {
-  uint32_t s = 12345;
-  explicit Rng(uint32_t seed = 12345) : s(seed ? seed : 1) {}
-  float next() {
-    s ^= s << 13; s ^= s >> 17; s ^= s << 5;
-    return (s & 0xFFFFFF) / 16777216.f;
-  }
-  float range(float a, float b) { return a + next() * (b - a); }
-};
+// ---- palette (Roblox-ish, flat and bright) ----
+namespace pal {
+const Vec3 GRASS_A(0.39f, 0.72f, 0.29f);
+const Vec3 GRASS_B(0.35f, 0.66f, 0.26f);
+const Vec3 PLATE(0.55f, 0.57f, 0.60f);
+const Vec3 STONE(0.66f, 0.68f, 0.72f);
+const Vec3 RED(0.90f, 0.22f, 0.22f);
+const Vec3 ORANGE(0.98f, 0.55f, 0.16f);
+const Vec3 YELLOW(0.98f, 0.84f, 0.18f);
+const Vec3 BLUE(0.20f, 0.48f, 0.92f);
+const Vec3 CYAN(0.16f, 0.80f, 0.86f);
+const Vec3 GREEN(0.24f, 0.78f, 0.38f);
+const Vec3 PURPLE(0.62f, 0.34f, 0.88f);
+const Vec3 PINK(0.96f, 0.45f, 0.70f);
+const Vec3 BROWN(0.55f, 0.36f, 0.20f);
+const Vec3 SKIN(0.98f, 0.83f, 0.36f);
+const Vec3 SHIRT(0.16f, 0.52f, 0.90f);
+const Vec3 PANTS(0.18f, 0.22f, 0.34f);
+const Vec3 DARK(0.12f, 0.13f, 0.16f);
+const Vec3 WHITE(0.96f, 0.97f, 0.98f);
+const Vec3 GOLD(1.00f, 0.80f, 0.16f);
+}  // namespace pal
 
-// chunk generation (used by the renderer and tests)
-void buildChunk(Chunk& chunk, int cx, int cz, int segments, float size);
+// player box
+constexpr float PLAYER_R = 0.30f;   // half width / depth
+constexpr float PLAYER_H = 1.80f;   // total height
+constexpr float GRAVITY = 30.f;
+constexpr float JUMP_V = 10.4f;
+constexpr float WALK_SPEED = 5.2f;
+constexpr float RUN_SPEED = 8.0f;
 
-struct PropVertex {
-  float px, py, pz;
-  float nx, ny, nz;
-  float cr, cg, cb;
-};
-
-/** Generates tree/rock geometry merged into a vertex/index pair. */
-void buildPropGeometry(const std::vector<TreeInstance>& trees, const std::vector<RockInstance>& rocks,
-                       std::vector<PropVertex>& outVerts, std::vector<uint16_t>& outIdx);
-
-}  // namespace ae
+}  // namespace blox
