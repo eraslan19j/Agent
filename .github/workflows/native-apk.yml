@@ -103,14 +103,14 @@ jobs:
         run: |
           mkdir -p out
           APK=$(find native/app/build/outputs/apk/release -name '*.apk' | head -1)
-          cp "$APK" out/Aetherion-Native-0.3.0.apk
+          cp "$APK" out/Aetherion-Native-0.3.1.apk
           ls -lh out
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: Aetherion-Native-APK
-          path: out/Aetherion-Native-0.3.0.apk
+          path: out/Aetherion-Native-0.3.1.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -119,7 +119,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release delete apk-latest --yes --cleanup-tag 2>/dev/null || true
-          gh release create apk-latest out/Aetherion-Native-0.3.0.apk \
+          gh release create apk-latest out/Aetherion-Native-0.3.1.apk \
             --title "AETHERION v0.3.0 NATIVE — APK (${GITHUB_SHA:0:7})" \
             --notes "**AETHERION v0.3.0 — Native (C++ / OpenGL ES 3 + Kotlin)** · $(git rev-parse --short HEAD)
 

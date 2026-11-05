@@ -5,6 +5,7 @@
 #include <android/log.h>
 #include <cstdio>
 #include <cstring>
+#include <cstdarg>
 #include <cmath>
 #include <algorithm>
 #include "shaders.h"
@@ -26,6 +27,10 @@ const float CHAR_STRIDE = 40.f;      // 9 floats + 4 bytes
 const float TERRAIN_STRIDE = 36.f;   // 9 floats
 const float PART_STRIDE = 32.f;      // pos3 + rgba4 + size1
 
+// global sink so shader compile failures reach the in-game diagnostics
+char g_errSink[2048] = {0};
+inline void setErrSink(const char* msg) { snprintf(g_errSink, sizeof(g_errSink), "%s", msg); }
+
 GLuint compile(GLenum type, const char* src) {
   GLuint s = glCreateShader(type);
   glShaderSource(s, 1, &src, nullptr);
@@ -37,6 +42,7 @@ GLuint compile(GLenum type, const char* src) {
     GLsizei n = 0;
     glGetShaderInfoLog(s, sizeof(log), &n, log);
     LOGE("shader compile failed: %s", log);
+    setErrSink(log);
     glDeleteShader(s);
     return 0;
   }
@@ -48,6 +54,19 @@ std::string merge(const char* common, const char* body) {
 }
 
 }  // namespace
+
+void Renderer::note(const char* fmt, ...) {
+  char buf[1024];
+  va_list args;
+  va_start(args, fmt);
+  vsnprintf(buf, sizeof(buf), fmt, args);
+  va_end(args);
+  LOGE("%s", buf);
+  if (error_.size() < 3000) {
+    if (!error_.empty()) error_ += " | ";
+    error_ += buf;
+  }
+}
 
 GLint GlProgram::u(const char* name) {
   auto it = cache.find(name);
@@ -77,6 +96,7 @@ bool buildProgram(GlProgram& p, const std::string& vs, const std::string& fs, co
     GLsizei n = 0;
     glGetProgramInfoLog(prog, sizeof(log), &n, log);
     LOGE("link failed (%s): %s", label, log);
+    setErrSink(log);
     return false;
   }
   glDeleteShader(v);
@@ -91,14 +111,12 @@ GLuint Renderer::makeTexture(int w, int h, GLenum internal, GLenum format, GLenu
   glGenTextures(1, &tex);
   glBindTexture(GL_TEXTURE_2D, tex);
   glTexImage2D(GL_TEXTURE_2D, 0, (GLint)internal, w, h, 0, format, type, nullptr);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  // depth textures must be NEAREST-filtered unless compare mode is enabled
+  GLenum filter = depth ? GL_NEAREST : GL_LINEAR;
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  if (depth) {
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
-  }
   glBindTexture(GL_TEXTURE_2D, 0);
   return tex;
 }
@@ -111,38 +129,31 @@ bool Renderer::init() {
   LOGI("GL: %s", glInfo_);
 
   std::string common = shaders::COMMON;
+  std::string vs300 = "#version 300 es\n";
 
-  if (!buildProgram(sky_, std::string("#version 300 es\n") + shaders::SKY_VS,
-                    std::string("#version 300 es\n") + common + shaders::SKY_BODY, "sky"))
+  auto build = [&](GlProgram& prog, const std::string& vs, const std::string& fs, const char* label) {
+    g_errSink[0] = 0;
+    if (buildProgram(prog, vs, fs, label)) return true;
+    note("%s: %s", label, g_errSink[0] ? g_errSink : "shader compile/link failed");
     return false;
+  };
 
-  std::string litVs = std::string("#version 300 es\n") + shaders::LIT_VS;
-  std::string litFs = std::string("#version 300 es\n") + common + shaders::LIT_FS_BODY;
-  if (!buildProgram(lit_, litVs, litFs, "lit")) return false;
+  build(sky_, vs300 + shaders::SKY_VS, vs300 + common + shaders::SKY_BODY, "sky");
+  build(lit_, vs300 + shaders::LIT_VS, vs300 + common + shaders::LIT_FS_BODY, "lit");
+  build(skin_, vs300 + shaders::SKIN_VS, vs300 + common + shaders::SKIN_FS_BODY, "skin");
+  build(water_, vs300 + shaders::WATER_VS, vs300 + common + shaders::WATER_FS_BODY, "water");
+  build(part_, vs300 + shaders::PART_VS, vs300 + shaders::PART_FS, "particles");
+  build(trail_, vs300 + shaders::TRAIL_VS, vs300 + shaders::TRAIL_FS, "trail");
+  build(bright_, vs300 + shaders::QUAD_VS, vs300 + shaders::BRIGHT_FS, "bright");
+  build(blur_, vs300 + shaders::QUAD_VS, vs300 + shaders::BLUR_FS, "blur");
+  build(composite_, vs300 + shaders::QUAD_VS, vs300 + shaders::COMPOSITE_FS, "composite");
+  build(depth_, vs300 + shaders::DEPTH_VS, vs300 + shaders::DEPTH_FS, "depth");
+  build(depthSkin_, vs300 + shaders::DEPTH_SKIN_VS, vs300 + shaders::DEPTH_FS, "depthSkin");
 
-  std::string skinVs = std::string("#version 300 es\n") + shaders::SKIN_VS;
-  std::string skinFs = std::string("#version 300 es\n") + common + shaders::SKIN_FS_BODY;
-  if (!buildProgram(skin_, skinVs, skinFs, "skin")) return false;
-
-  std::string waterVs = std::string("#version 300 es\n") + shaders::WATER_VS;
-  std::string waterFs = std::string("#version 300 es\n") + common + shaders::WATER_FS_BODY;
-  if (!buildProgram(water_, waterVs, waterFs, "water")) return false;
-
-  if (!buildProgram(part_, std::string("#version 300 es\n") + shaders::PART_VS,
-                    std::string("#version 300 es\n") + shaders::PART_FS, "particles"))
+  if (!lit_.id && !skin_.id) {
+    note("no world shader available - aborting init");
     return false;
-  if (!buildProgram(trail_, std::string("#version 300 es\n") + shaders::TRAIL_VS,
-                    std::string("#version 300 es\n") + shaders::TRAIL_FS, "trail"))
-    return false;
-  if (!buildProgram(bright_, std::string("#version 300 es\n") + shaders::QUAD_VS,
-                    std::string("#version 300 es\n") + shaders::BRIGHT_FS, "bright"))
-    return false;
-  if (!buildProgram(blur_, std::string("#version 300 es\n") + shaders::QUAD_VS,
-                    std::string("#version 300 es\n") + shaders::BLUR_FS, "blur"))
-    return false;
-  if (!buildProgram(composite_, std::string("#version 300 es\n") + shaders::QUAD_VS,
-                    std::string("#version 300 es\n") + shaders::COMPOSITE_FS, "composite"))
-    return false;
+  }
 
   // fullscreen quad
   const float quad[] = {-1, -1, 3, -1, -1, 3};
@@ -251,8 +262,8 @@ bool Renderer::init() {
   GLenum st = glCheckFramebufferStatus(GL_FRAMEBUFFER);
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
   if (st != GL_FRAMEBUFFER_COMPLETE) {
-    LOGE("shadow FBO incomplete: 0x%x", st);
-    return false;
+    note("shadow FBO incomplete (0x%x) - shadows disabled", st);
+    shadowEnabled_ = false;
   }
 
   resize(1, 1);
@@ -262,7 +273,8 @@ bool Renderer::init() {
   // so we render two-sided: missing faces would be a much worse bug than a few
   // wasted triangles on a mobile GPU.
   glDisable(GL_CULL_FACE);
-  LOGI("renderer initialised");
+  ready_ = true;
+  LOGI("renderer initialised (hdr=%d shadow=%d)", (int)hdr_, (int)shadowEnabled_);
   return true;
 }
 
@@ -456,21 +468,18 @@ void Renderer::frame(Game& g, float dt) {
     poseToMatrices(model_, p, e.pos, e.yaw, e.scale, enemyPalettes[i].data());
   }
 
-  // ---- shadow pass ----
-  glBindFramebuffer(GL_FRAMEBUFFER, shadowFbo_);
-  glViewport(0, 0, SHADOW_SIZE, SHADOW_SIZE);
-  glClearColor(1, 1, 1, 1);
-  glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
-  glEnable(GL_DEPTH_TEST);
-  glDepthMask(GL_TRUE);
-  glDisable(GL_BLEND);
-  {
-    glUseProgram(lit_.id);
-    glUniformMatrix4fv(lit_.u("uVP"), 1, GL_FALSE, lightVP_.m);
-    glUniformMatrix4fv(lit_.u("uLightVP"), 1, GL_FALSE, lightVP_.m);
-    glUniform1f(lit_.u("uFogDensity"), 0.f);
-    glUniform1f(lit_.u("uExposure"), 1.f);
-    glUniform3f(lit_.u("uCamPos"), camPos.x, camPos.y, camPos.z);
+  // ---- shadow pass (depth only: never sample the map while rendering into it) ----
+  if (shadowEnabled_ && depth_.id) {
+    glBindFramebuffer(GL_FRAMEBUFFER, shadowFbo_);
+    glViewport(0, 0, SHADOW_SIZE, SHADOW_SIZE);
+    glClearColor(1, 1, 1, 1);
+    glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
+    glEnable(GL_DEPTH_TEST);
+    glDepthMask(GL_TRUE);
+    glDisable(GL_BLEND);
+
+    glUseProgram(depth_.id);
+    glUniformMatrix4fv(depth_.u("uLightVP"), 1, GL_FALSE, lightVP_.m);
     for (auto* c : chunks_) {
       glBindVertexArray(c->vao);
       glDrawElements(GL_TRIANGLES, c->count, GL_UNSIGNED_SHORT, nullptr);
@@ -481,31 +490,23 @@ void Renderer::frame(Game& g, float dt) {
         drawCalls_++;
       }
     }
-    // characters cast shadows too
-    glUseProgram(skin_.id);
-    glUniformMatrix4fv(skin_.u("uVP"), 1, GL_FALSE, lightVP_.m);
-    glUniformMatrix4fv(skin_.u("uLightVP"), 1, GL_FALSE, lightVP_.m);
-    glUniformMatrix4fv(skin_.u("uBones"), BONE_COUNT, GL_FALSE, playerBones[0].m);
-    glUniform1f(skin_.u("uShadowTexel"), 0.f);
-    glUniform3f(skin_.u("uCloth"), 0, 0, 0);
-    glUniform3f(skin_.u("uAccent"), 0, 0, 0);
-    glUniform3f(skin_.u("uSkinTone"), 0, 0, 0);
-    glUniform3f(skin_.u("uHair"), 0, 0, 0);
-    glUniform1f(skin_.u("uHitFlash"), 0.f);
-    glUniform1f(skin_.u("uGlow"), 0.f);
-    glUniform3f(skin_.u("uCamPos"), camPos.x, camPos.y, camPos.z);
-    glBindVertexArray(charVao_);
-    for (size_t i = 0; i < g.enemies.size(); i++) {
-      if (!g.enemies[i].alive && g.enemies[i].anim.time > 1.1f) continue;
-      glUniformMatrix4fv(skin_.u("uBones"), BONE_COUNT, GL_FALSE, enemyPalettes[i][0].m);
+    if (depthSkin_.id) {
+      glUseProgram(depthSkin_.id);
+      glUniformMatrix4fv(depthSkin_.u("uLightVP"), 1, GL_FALSE, lightVP_.m);
+      glBindVertexArray(charVao_);
+      for (size_t i = 0; i < g.enemies.size(); i++) {
+        Enemy& e = g.enemies[i];
+        if (!e.alive && e.anim.time > 1.1f) continue;
+        glUniformMatrix4fv(depthSkin_.u("uBones"), BONE_COUNT, GL_FALSE, enemyPalettes[i][0].m);
+        glDrawElements(GL_TRIANGLES, charCount_, GL_UNSIGNED_SHORT, nullptr);
+        drawCalls_++;
+      }
+      glUniformMatrix4fv(depthSkin_.u("uBones"), BONE_COUNT, GL_FALSE, playerBones[0].m);
       glDrawElements(GL_TRIANGLES, charCount_, GL_UNSIGNED_SHORT, nullptr);
       drawCalls_++;
     }
-    glUniformMatrix4fv(skin_.u("uBones"), BONE_COUNT, GL_FALSE, playerBones[0].m);
-    glDrawElements(GL_TRIANGLES, charCount_, GL_UNSIGNED_SHORT, nullptr);
-    drawCalls_++;
+    glBindVertexArray(0);
   }
-  glBindVertexArray(0);
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
   // ---- scene pass ----
@@ -543,7 +544,7 @@ void Renderer::frame(Game& g, float dt) {
   }
 
   // terrain + props
-  {
+  if (lit_.id) {
     glUseProgram(lit_.id);
     glUniformMatrix4fv(lit_.u("uVP"), 1, GL_FALSE, vp.m);
     glUniformMatrix4fv(lit_.u("uLightVP"), 1, GL_FALSE, lightVP_.m);
@@ -575,7 +576,7 @@ void Renderer::frame(Game& g, float dt) {
   }
 
   // water
-  {
+  if (water_.id) {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glUseProgram(water_.id);
@@ -599,7 +600,7 @@ void Renderer::frame(Game& g, float dt) {
   }
 
   // characters
-  {
+  if (skin_.id) {
     glUseProgram(skin_.id);
     glUniformMatrix4fv(skin_.u("uVP"), 1, GL_FALSE, vp.m);
     glUniformMatrix4fv(skin_.u("uLightVP"), 1, GL_FALSE, lightVP_.m);
@@ -659,7 +660,7 @@ void Renderer::frame(Game& g, float dt) {
                            p.size * (0.55f + t * 0.75f)});
       n++;
     }
-    if (n > 0) {
+    if (n > 0 && part_.id) {
       glEnable(GL_BLEND);
       glBlendFunc(GL_SRC_ALPHA, GL_ONE);
       glDepthMask(GL_FALSE);
@@ -702,7 +703,7 @@ void Renderer::frame(Game& g, float dt) {
       prevB = tp.b;
       hasPrev = true;
     }
-    if (pairs > 0) {
+    if (pairs > 0 && trail_.id) {
       glEnable(GL_BLEND);
       glBlendFunc(GL_SRC_ALPHA, GL_ONE);
       glDepthMask(GL_FALSE);
@@ -727,6 +728,27 @@ void Renderer::frame(Game& g, float dt) {
 }
 
 void Renderer::renderPost(const Game& g) {
+  if (!composite_.id || !bright_.id || !bloomFboA_) {
+    // minimal fallback: blit the scene straight to the screen
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(0, 0, w_, h_);
+    glDisable(GL_DEPTH_TEST);
+    if (bright_.id) {
+      glUseProgram(bright_.id);
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, sceneColor_);
+      glUniform1i(bright_.u("uTex"), 0);
+      glUniform1f(bright_.u("uThreshold"), 0.f);
+      glBindVertexArray(quadVao_);
+      glDrawArrays(GL_TRIANGLES, 0, 3);
+    } else {
+      glClearColor(g.fogColor.x, g.fogColor.y, g.fogColor.z, 1.f);
+      glClear(GL_COLOR_BUFFER_BIT);
+    }
+    glEnable(GL_DEPTH_TEST);
+    return;
+  }
+
   // bright pass
   glBindFramebuffer(GL_FRAMEBUFFER, bloomFboA_);
   glViewport(0, 0, bloomW_, bloomH_);

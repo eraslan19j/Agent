@@ -64,6 +64,15 @@ class MainActivity : AppCompatActivity() {
 
         prefs = getSharedPreferences("aetherion", Context.MODE_PRIVATE)
 
+        // keep the last crash so the title screen can show why the game died
+        val previous = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, error ->
+            prefs.edit()
+                .putString("lastCrash", android.util.Log.getStackTraceString(error))
+                .apply()
+            previous?.uncaughtException(thread, error)
+        }
+
         game = findViewById(R.id.game)
         hud = findViewById(R.id.hud)
         menuRoot = findViewById(R.id.menuRoot)
@@ -84,6 +93,24 @@ class MainActivity : AppCompatActivity() {
         wireSettings()
         applySettings()
         introAnimation()
+        updateDiag()
+    }
+
+    /** Engine/GL status shown under the title so a black screen never stays a mystery. */
+    private fun updateDiag() {
+        val sb = StringBuilder()
+        if (!Engine.loaded) {
+            sb.append("motor yüklenemedi: ").append(Engine.loadError)
+        } else {
+            sb.append(Engine.glInfo())
+            if (!Engine.ready()) sb.append("\nhazır değil: ").append(Engine.lastError().take(220))
+        }
+        val crash = prefs.getString("lastCrash", null)
+        if (!crash.isNullOrBlank()) {
+            val head = crash.lineSequence().filter { it.isNotBlank() }.take(2).joinToString(" | ")
+            sb.append("\nson hata: ").append(head.take(240))
+        }
+        gpuInfo.text = sb.toString()
     }
 
     private fun hideSystemBars() {
@@ -361,7 +388,7 @@ class MainActivity : AppCompatActivity() {
         menuRoot.visibility = View.VISIBLE
         screenChars.visibility = View.GONE
         screenMenu.visibility = View.VISIBLE
-        gpuInfo.text = Engine.glInfo()
+        updateDiag()
     }
 
     private fun showPause(show: Boolean) {

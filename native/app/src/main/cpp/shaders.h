@@ -249,6 +249,36 @@ void main() {
 }
 )GLSL";
 
+// ---------------------------------------------------------------- shadow depth only
+static const char* DEPTH_VS = R"GLSL(
+#version 300 es
+layout(location = 0) in vec3 aPos;
+uniform mat4 uLightVP;
+void main() { gl_Position = uLightVP * vec4(aPos, 1.0); }
+)GLSL";
+
+static const char* DEPTH_SKIN_VS = R"GLSL(
+#version 300 es
+layout(location = 0) in vec3 aPos;
+layout(location = 3) in vec2 aJoints;
+layout(location = 4) in float aWeight;
+uniform mat4 uLightVP;
+uniform mat4 uBones[21];
+void main() {
+  mat4 m0 = uBones[int(aJoints.x)];
+  mat4 m1 = uBones[int(aJoints.y)];
+  mat4 sk = m0 * aWeight + m1 * (1.0 - aWeight);
+  gl_Position = uLightVP * (sk * vec4(aPos, 1.0));
+}
+)GLSL";
+
+static const char* DEPTH_FS = R"GLSL(
+#version 300 es
+precision highp float;
+out vec4 fragColor;
+void main() { fragColor = vec4(1.0); }
+)GLSL";
+
 // ---------------------------------------------------------------- water
 static const char* WATER_VS = R"GLSL(
 #version 300 es

@@ -4,6 +4,25 @@ Tüm önemli değişiklikler bu dosyada tutulur. Biçim: [Keep a Changelog](http
 
 ---
 
+## [0.3.1] — "Siyah Ekran Hotfix" (NATIVE) — 2026-11-05
+
+**Bloklayıcı hata düzeltildi: 0.3.0 kurulduğunda oyun siyah ekran veriyordu.**
+
+### Düzeltildi — renderer
+- Gölge geçişi artık **yalnız derinlik** yazan özel programlarla (`DEPTH_VS`, `DEPTH_SKIN_VS`, `DEPTH_FS`) çiziliyor; gölge haritası çizilirken aynı doku örneklenmiyordu (sampler feedback → tanımsız/boş kare riski kalktı)
+- Gölge FBO tamamlanmazsa renderer **ölüyordu**; artık gölgeler kapanıp sahne çizilmeye devam ediyor (`shadowEnabled_`)
+- Gölge derinlik dokusunda geçersiz `GL_TEXTURE_COMPARE_MODE = GL_NEAREST` parametresi ve `LINEAR` filtresi kaldırıldı (`NEAREST`)
+- Shader derleme/bağlama hataları artık **sessizce yutulmuyor**: hata metni `lastError()` ile Kotlin'e ve ekrana taşınıyor
+- Bloom/composite programları yoksa sahne doğrudan ekrana basılıyor (siyah kare yerine görüntü)
+- Renderer hazır değilse GL tamponu koyu mor ile temizleniyor → sessiz siyah ekran yerine anlaşılır durum
+
+### Düzeltildi — Android katmanı
+- `GLSurfaceView` EGL yapılandırması artık **kademeli**: 24-bit derinlik → 16-bit → sürücü varsayılanı. Uygun config bulunamadığında yüzey hiç oluşmuyordu (tam siyah ekran)
+- `System.loadLibrary` ve tüm JNI çağrıları güvenli sarmalandı; native kütüphane yüklenemezse uygulama çökmüyor
+- Menüde **teşhis paneli**: GL sürümü/renderer/üretici, motor hazır mı, son shader hatası, son çökme izi (SharedPreferences'ta saklanır)
+
+---
+
 ## [0.3.0] — "Kıvılcım" (NATIVE) — 2026-11-05
 
 **Mimari değişti: WebView/three.js bırakıldı.** Oyun artık gerçek bir Android uygulaması:

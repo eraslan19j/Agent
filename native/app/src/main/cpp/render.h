@@ -33,6 +33,11 @@ class Renderer {
   void shutdown();
   int framesRendered() const { return frames_; }
   const char* glInfo() const { return glInfo_; }
+  const char* lastError() const { return error_.c_str(); }
+  bool ready() const { return ready_; }
+  bool usingHdr() const { return hdr_; }
+  bool shadowsEnabled() const { return shadowEnabled_; }
+  void note(const char* fmt, ...);
   int drawCalls() const { return drawCalls_; }
 
  private:
@@ -48,7 +53,10 @@ class Renderer {
   int frames_ = 0, drawCalls_ = 0;
   char glInfo_[192] = {0};
 
-  GlProgram sky_, lit_, skin_, water_, part_, trail_, bright_, blur_, composite_;
+  GlProgram sky_, lit_, skin_, water_, part_, trail_, bright_, blur_, composite_, depth_, depthSkin_;
+  std::string error_;
+  bool ready_ = false;
+  bool shadowEnabled_ = true;
   GLuint quadVao_ = 0, quadVbo_ = 0;
 
   // framebuffers
