@@ -36,7 +36,9 @@ npm run lint    # ESLint
 
 ## Android
 
-Gereksinimler: JDK 21, Android Studio ve Android SDK 36.
+**Hazır test APK'sı:** [My Vision v1.0.0 debug APK](https://github.com/eraslan19j/Agent/releases/download/my-vision-v1.0.0-debug/My-Vision-1.0.0-debug.apk)
+
+Yerel derleme gereksinimleri: JDK 21, Android Studio ve Android SDK 36.
 
 ```bash
 npm run cap:sync
