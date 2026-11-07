@@ -17,7 +17,6 @@ export interface PhotoPreset {
   id: string;
   name: string;
   category: 'Portre' | 'Sinema' | 'Seyahat' | 'Siyah Beyaz';
-  image: string;
   pro: boolean;
   tone: Tone;
   accent: string;

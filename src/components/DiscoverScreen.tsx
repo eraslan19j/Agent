@@ -1,57 +1,75 @@
-import { useMemo, useState } from 'react';
-import { ArrowUpRight, Crown, Search, Sparkles, X } from 'lucide-react';
-import { GALLERY } from '../data/samples';
-import { getPreset } from '../data/presets';
-import { buildCssFilter, freshSettings } from '../lib/imageEngine';
-import type { EditorSession } from '../types';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ArrowDownToLine, ArrowUpRight, ExternalLink, RefreshCw, Shuffle, WifiOff, X } from 'lucide-react';
+import { fetchDiscoverPhotos, randomDiscoverPage, type DiscoverPhoto } from '../lib/discoverService';
 import { ScreenHeader } from './ScreenHeader';
-
-const categories = ['Tümü', 'Portre', 'Sinema', 'Seyahat', 'Siyah Beyaz'];
 
 interface DiscoverScreenProps {
   isPro: boolean;
-  onOpen: (session: EditorSession) => void;
+  onUsePhoto: (photo: DiscoverPhoto) => void | boolean | Promise<void | boolean>;
   onPro: () => void;
   onNotifications: () => void;
+  busy?: boolean;
 }
 
-export function DiscoverScreen({ isPro, onOpen, onPro, onNotifications }: DiscoverScreenProps) {
-  const [category, setCategory] = useState('Tümü');
-  const [query, setQuery] = useState('');
-  const filtered = useMemo(() => GALLERY.filter((item) =>
-    (category === 'Tümü' || item.category === category) &&
-    `${item.title} ${item.category}`.toLocaleLowerCase('tr').includes(query.toLocaleLowerCase('tr')),
-  ), [category, query]);
+export function DiscoverScreen({ isPro, onUsePhoto, onPro, onNotifications, busy = false }: DiscoverScreenProps) {
+  const [photos, setPhotos] = useState<DiscoverPhoto[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [selected, setSelected] = useState<DiscoverPhoto | null>(null);
+  const [page, setPage] = useState(0);
+  const [using, setUsing] = useState(false);
+  const requestId = useRef(0);
+
+  const load = useCallback(async (nextPage = randomDiscoverPage(), force = false) => {
+    const id = ++requestId.current;
+    setLoading(true); setError(''); setPage(nextPage);
+    try {
+      const result = await fetchDiscoverPhotos(nextPage, force);
+      if (id === requestId.current) setPhotos(result);
+    } catch (reason) {
+      if (id === requestId.current) setError(reason instanceof Error && reason.name === 'AbortError' ? 'Bağlantı zaman aşımına uğradı. İnternetini kontrol edip yeniden dene.' : 'Fotoğraflar şu anda alınamadı. Bağlantını kontrol edip yeniden dene.');
+    } finally {
+      if (id === requestId.current) setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void load(); }, 0);
+    return () => { window.clearTimeout(timer); requestId.current += 1; };
+  }, [load]);
+
+  const handleUsePhoto = async () => {
+    if (!selected) return;
+    setUsing(true);
+    try {
+      const imported = await onUsePhoto(selected);
+      if (imported !== false) setSelected(null);
+    } finally { setUsing(false); }
+  };
 
   return (
     <div className="screen discover-screen page-enter">
-      <ScreenHeader eyebrow="İLHAM PANOSU" title="Bak. Keşfet. Yarat." subtitle="Editör seçkileriyle kendi görsel dilini bul." isPro={isPro} onPro={onPro} onNotifications={onNotifications} />
-      <div className="discover-tools">
-        <label className="search-box"><Search size={19} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Görünüm veya stil ara" aria-label="Keşfette ara" />{query && <button onClick={() => setQuery('')} aria-label="Aramayı temizle"><X size={16} /></button>}</label>
-      </div>
-      <div className="chip-row" role="tablist" aria-label="Kategoriler">
-        {categories.map((item) => <button role="tab" aria-selected={category === item} className={category === item ? 'chip active' : 'chip'} key={item} onClick={() => setCategory(item)}>{item}</button>)}
-      </div>
-      <div className="discover-feature">
-        <div><span className="eyebrow"><Sparkles size={13} /> HAFTANIN SEÇKİSİ</span><h2>Altın saatin<br /><em>büyüsünü</em> yakala.</h2><p>Günün en yumuşak ışığını altı özel görünümle yeniden yarat.</p></div>
-        <img src="/images/beach.jpg" alt="Altın saatte kıyı" />
-      </div>
-      <div className="section-heading"><div><span className="eyebrow">EDITÖRÜN SEÇİMİ</span><h2>{category === 'Tümü' ? 'Sana ilham versin' : category}</h2></div><span className="result-count">{filtered.length} çalışma</span></div>
-      {filtered.length ? (
-        <div className="inspiration-grid">
-          {filtered.map((item) => {
-            const preset = getPreset(item.presetId);
-            return (
-              <button className={`inspiration-card inspiration-card--${item.size}`} key={item.id} onClick={() => { if (preset.pro && !isPro) { onPro(); return; } onOpen({ source: item.image, name: item.title, initialSettings: { ...freshSettings(), presetId: item.presetId } }); }}>
-                <img src={item.image} alt={item.title} style={{ filter: buildCssFilter({ ...freshSettings(), presetId: item.presetId }) }} />
-                <span className="inspiration-card__overlay" />
-                <span className="inspiration-card__top">{preset.pro && !isPro ? <i><Crown size={12} /> PRO</i> : <i>{item.category}</i>}<b><ArrowUpRight size={18} /></b></span>
-                <span className="inspiration-card__bottom"><strong>{item.title}</strong><small>{preset.name} görünümüyle dene</small></span>
-              </button>
-            );
-          })}
-        </div>
-      ) : <div className="empty-state"><Search size={32} /><h3>Sonuç bulunamadı</h3><p>Başka bir kelime veya kategori deneyebilirsin.</p><button className="button button--outline" onClick={() => { setQuery(''); setCategory('Tümü'); }}>Filtreleri temizle</button></div>}
+      <ScreenHeader eyebrow="GERÇEK FOTOĞRAFLAR · YENİ BAKIŞLAR" title="Keşfet" subtitle="Her karıştırmada değişen, kaynağı açıkça belirtilen fotoğraf seçkisi." isPro={isPro} onPro={onPro} onNotifications={onNotifications} />
+      <section className="discover-intro glass-panel"><div><span className="eyebrow">SÜREKLİ DEĞİŞEN SEÇKİ</span><h2>Bir sonraki kareni bul.</h2><p>Beğendiğin fotoğrafı stüdyona aktar, düzenle ve kendi görüşünü yarat.</p></div><button className="button button--lime" onClick={() => void load(randomDiscoverPage(page), true)} disabled={loading}><Shuffle size={17} /> Karıştır</button></section>
+      <div className="source-note"><span className="source-dot" /> Fotoğraflar <strong>Lorem Picsum</strong> üzerinden yüklenir · Fotoğrafçı adı her kartta belirtilir.</div>
+      {error ? <div className="empty-state glass-panel network-error"><WifiOff size={35} /><h2>Seçkiye ulaşılamadı.</h2><p>{error}</p><button className="button button--lime" onClick={() => void load(page || randomDiscoverPage(), true)}><RefreshCw size={17} /> Yeniden dene</button></div>
+        : loading && photos.length === 0 ? <div className="discover-grid skeleton-grid" aria-label="Fotoğraflar yükleniyor">{Array.from({ length: 8 }, (_, i) => <div className="skeleton-card" key={i}><span /><i /><b /></div>)}</div>
+          : <div className={`discover-grid ${loading ? 'is-refreshing' : ''}`}>{photos.map((photo, index) => (
+            <button className="discover-card stagger-item" style={{ animationDelay: `${Math.min(index * 30, 300)}ms` }} key={`${page}-${photo.id}`} onClick={() => setSelected(photo)}>
+              <img src={photo.thumbnailUrl} alt={`${photo.author} tarafından çekilen fotoğraf`} loading="lazy" />
+              <span className="discover-card-shade" /><span className="discover-card-open"><ArrowUpRight size={18} /></span>
+              <span className="discover-card-caption"><strong>{photo.author}</strong><span>Lorem Picsum · {photo.width} × {photo.height}</span></span>
+            </button>
+          ))}</div>}
+      {!loading && !error && photos.length > 0 && <button className="button button--glass discover-more" onClick={() => void load(randomDiscoverPage(page), true)}><Shuffle size={18} /> Başka fotoğraflar göster</button>}
+      {selected && <div className="modal-backdrop" onClick={() => !using && setSelected(null)}><div className="discover-detail glass-modal" role="dialog" aria-modal="true" aria-label={`${selected.author} fotoğrafı`} onClick={(e) => e.stopPropagation()}>
+        <button className="modal-close icon-button" onClick={() => setSelected(null)} disabled={using} aria-label="Kapat"><X size={20} /></button>
+        <img className="discover-detail-image" src={selected.fullUrl} alt={`${selected.author} tarafından çekilen fotoğraf`} />
+        <div className="discover-detail-copy"><span className="eyebrow">FOTOĞRAFÇI</span><h2>{selected.author}</h2><p>{selected.width} × {selected.height} orijinal piksel · Lorem Picsum</p></div>
+        <button className="button button--lime button-large" onClick={() => void handleUsePhoto()} disabled={using || busy}>{using || busy ? <><RefreshCw size={19} className="spin" /> Fotoğraf hazırlanıyor…</> : <><ArrowDownToLine size={19} /> Düzenlemeye aktar <ArrowUpRight size={18} /></>}</button>
+        <a className="photo-attribution" href={selected.sourceUrl} target="_blank" rel="noreferrer">Kaynak sayfasını aç <ExternalLink size={13} /></a>
+        <p className="license-note">Kullanmadan önce kaynak sayfasındaki güncel kullanım koşullarını kontrol et.</p>
+      </div></div>}
     </div>
   );
 }

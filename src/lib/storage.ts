@@ -9,7 +9,7 @@ export function loadProjects(): PhotoProject[] {
     const value = localStorage.getItem(PROJECTS_KEY);
     if (!value) return [];
     const projects = JSON.parse(value) as PhotoProject[];
-    return Array.isArray(projects) ? projects.filter((project) => project.source && project.settings) : [];
+    return Array.isArray(projects) ? projects.filter((project) => project.source && project.settings && !project.isSample && !project.id.startsWith('sample-')) : [];
   } catch {
     return [];
   }

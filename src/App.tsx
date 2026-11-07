@@ -12,12 +12,13 @@ import type { InfoTopic } from './components/ProfileScreen';
 import { PhotoEditor } from './components/PhotoEditor';
 import { Paywall } from './components/Paywall';
 import { InfoModal } from './components/InfoModal';
+import { MyVisionLogo } from './components/MyVisionLogo';
 import { Toast } from './components/Toast';
 import type { ToastMessage } from './components/Toast';
-import { freshSettings, preparePhoto } from './lib/imageEngine';
+import { preparePhoto } from './lib/imageEngine';
 import { loadPreviewPro, loadProjects, persistProjects, savePreviewPro } from './lib/storage';
 import { hasNativePro, isNativeBillingAvailable, purchaseNativePlan, restoreNativePurchases } from './lib/billing';
-import { getPreset } from './data/presets';
+import type { DiscoverPhoto } from './lib/discoverService';
 import type { AppView, EditorSession, PhotoProject, PlanInterval } from './types';
 
 export default function App() {
@@ -28,6 +29,7 @@ export default function App() {
   const [paywallOpen, setPaywallOpen] = useState(false);
   const [infoTopic, setInfoTopic] = useState<InfoTopic | null>(null);
   const [importing, setImporting] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
@@ -41,10 +43,14 @@ export default function App() {
 
   useEffect(() => {
     if (Capacitor.isNativePlatform()) void SplashScreen.hide();
+    const splashTimer = window.setTimeout(() => setShowSplash(false), 1200);
     if (isNativeBillingAvailable()) {
       void hasNativePro().then(setIsPro).catch(() => undefined);
     }
-    return () => { if (toastTimer.current) clearTimeout(toastTimer.current); };
+    return () => {
+      window.clearTimeout(splashTimer);
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+    };
   }, []);
 
   useEffect(() => {
@@ -129,10 +135,33 @@ export default function App() {
     } else showToast('Proje silinemedi.', 'info');
   };
 
-  const openPreset = (presetId: string) => {
-    const preset = getPreset(presetId);
-    if (preset.pro && !isPro) { setPaywallOpen(true); return; }
-    setSession({ source: preset.image, name: `${preset.name} çalışması`, initialSettings: { ...freshSettings(), presetId } });
+  const openProject = (project: PhotoProject) => {
+    setSession({
+      source: project.source,
+      name: project.name,
+      projectId: project.id,
+      initialSettings: project.settings,
+    });
+  };
+
+  const importDiscoverPhoto = async (photo: DiscoverPhoto): Promise<boolean> => {
+    setImporting(true);
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 20000);
+    try {
+      const response = await fetch(photo.fullUrl, { signal: controller.signal });
+      if (!response.ok) throw new Error('Fotoğraf indirilemedi.');
+      const blob = await response.blob();
+      if (!blob.type.startsWith('image/')) throw new Error('Geçerli bir görsel alınamadı.');
+      const safeName = photo.author.replace(/[^a-zA-Z0-9ğüşöçıİĞÜŞÖÇ]+/g, '-').slice(0, 40);
+      const file = new File([blob], `Lorem-Picsum-${safeName}-${photo.id}.jpg`, { type: blob.type || 'image/jpeg' });
+      const source = await preparePhoto(file);
+      setSession({ source, name: `${photo.author} · Keşif` });
+      return true;
+    } catch {
+      showToast('Fotoğraf stüdyoya aktarılamadı. Bağlantını kontrol edip yeniden dene.', 'info');
+      return false;
+    } finally { window.clearTimeout(timeout); setImporting(false); }
   };
 
   const purchase = async (interval: PlanInterval) => {
@@ -164,11 +193,17 @@ export default function App() {
 
   return (
     <div className="app-shell">
+      {showSplash && <div className="app-splash" role="status" aria-label="My Vision yükleniyor">
+        <div className="splash-aura" aria-hidden="true" />
+        <div className="splash-brand"><MyVisionLogo variant="wordmark" size={54} /></div>
+        <span className="splash-caption">GÖRÜŞÜNÜ YARAT</span>
+        <span className="splash-progress" aria-hidden="true"><i /></span>
+      </div>}
       {!session && <Navigation view={view} onNavigate={setView} onCreate={openPicker} />}
       {!session && <main className="app-content">
-        {view === 'home' && <HomeScreen projects={projects} isPro={isPro} onOpen={setSession} onCreate={openPicker} onCamera={openCamera} onAuto={openAutoEnhance} onPro={() => setPaywallOpen(true)} onProjects={() => setView('projects')} onPreset={openPreset} onNotifications={() => showToast('Yeni Altın Saat koleksiyonu seni bekliyor.', 'info')} />}
-        {view === 'discover' && <DiscoverScreen isPro={isPro} onOpen={setSession} onPro={() => setPaywallOpen(true)} onNotifications={() => showToast('Haftanın seçkisi güncellendi.', 'info')} />}
-        {view === 'projects' && <ProjectsScreen projects={projects} isPro={isPro} onOpen={setSession} onCreate={openPicker} onDelete={deleteProject} onPro={() => setPaywallOpen(true)} onNotifications={() => showToast('Projelerin cihazında güvende.', 'info')} />}
+        {view === 'home' && <HomeScreen projects={projects} isPro={isPro} onOpen={openProject} onCreate={openPicker} onCamera={openCamera} onAuto={openAutoEnhance} onPro={() => setPaywallOpen(true)} onProjects={() => setView('projects')} onDiscover={() => setView('discover')} />}
+        {view === 'discover' && <DiscoverScreen isPro={isPro} onUsePhoto={importDiscoverPhoto} busy={importing} onPro={() => setPaywallOpen(true)} onNotifications={() => showToast('Karıştır düğmesi her dokunuşta yeni ve gerçek bir seçki getirir.', 'info')} />}
+        {view === 'projects' && <ProjectsScreen projects={projects} isPro={isPro} onOpen={openProject} onCreate={openPicker} onDelete={deleteProject} onPro={() => setPaywallOpen(true)} onNotifications={() => showToast('Projelerin cihazında güvende.', 'info')} />}
         {view === 'profile' && <ProfileScreen projects={projects} isPro={isPro} onPro={() => setPaywallOpen(true)} onInfo={setInfoTopic} onNotifications={() => showToast('Bildirim tercihlerini profil ayarlarından yönetebilirsin.', 'info')} onRestore={() => { void restore().catch(() => undefined); }} />}
       </main>}
       {session && <PhotoEditor session={session} isPro={isPro} onClose={() => setSession(null)} onSave={saveProject} onRequirePro={() => setPaywallOpen(true)} onToast={showToast} />}
@@ -178,7 +213,7 @@ export default function App() {
 
       {paywallOpen && <Paywall onClose={() => setPaywallOpen(false)} onPurchase={purchase} onRestore={restore} />}
       {infoTopic && <InfoModal topic={infoTopic} onClose={() => setInfoTopic(null)} />}
-      {importing && <div className="importing-overlay"><span><LoaderCircle className="spin" size={27} /></span><strong>Fotoğrafın hazırlanıyor</strong><small>Vizyonun birazdan başlıyor…</small></div>}
+      {importing && <div className="importing-overlay glass-modal"><MyVisionLogo size={58} /><span><LoaderCircle className="spin" size={25} /></span><strong>Fotoğrafın hazırlanıyor</strong><small>Vizyonun birazdan başlıyor…</small></div>}
       <Toast toast={toast} onClose={() => setToast(null)} />
     </div>
   );

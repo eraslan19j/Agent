@@ -1,10 +1,6 @@
-import { Aperture } from 'lucide-react';
+import { MyVisionLogo } from './MyVisionLogo';
 
+/** Backwards-compatible brand lockup used by navigation headers. */
 export function Brand({ compact = false }: { compact?: boolean }) {
-  return (
-    <div className={`brand ${compact ? 'brand--compact' : ''}`} aria-label="My Vision">
-      <span className="brand__mark"><Aperture size={compact ? 19 : 22} strokeWidth={2.4} /></span>
-      <span className="brand__word">My Vision<span className="brand__dot">.</span></span>
-    </div>
-  );
+  return <MyVisionLogo variant="wordmark" size={compact ? 31 : 38} className="brand-lockup" />;
 }

@@ -27,7 +27,7 @@ public class MainActivity extends BridgeActivity {
         super.onCreate(savedInstanceState);
 
         Window window = getWindow();
-        int background = Color.rgb(11, 11, 13);
+        int background = Color.rgb(10, 10, 10);
         window.setStatusBarColor(background);
         window.setNavigationBarColor(background);
         window.getDecorView().setBackgroundColor(background);
@@ -41,6 +41,7 @@ public class MainActivity extends BridgeActivity {
         }
 
         webView = getBridge().getWebView();
+        webView.setBackgroundColor(background);
         ViewCompat.setOnApplyWindowInsetsListener(webView, (view, windowInsets) -> {
             Insets safeArea = windowInsets.getInsets(
                 WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout()

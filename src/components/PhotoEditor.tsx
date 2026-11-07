@@ -6,10 +6,11 @@ import {
   Sparkles, Sun, Thermometer, Undo2, WandSparkles, Waves,
 } from 'lucide-react';
 import { AUTO_ENHANCE_SETTINGS, getPreset, PRESETS } from '../data/presets';
-import { buildCssFilter, createThumbnail, freshSettings, loadImage, outputDimensions, renderPhoto } from '../lib/imageEngine';
+import { buildCssFilter, createThumbnail, freshSettings, loadImage, outputDimensions, previewDimensions, renderPhoto } from '../lib/imageEngine';
 import { downloadBlob, shareProject } from '../lib/downloads';
 import type { AspectRatio, EditSettings, EditorSession, EditorTab, ExportOptions, PhotoProject } from '../types';
 import { Brand } from './Brand';
+import { MyVisionLogo } from './MyVisionLogo';
 import { Modal } from './Modal';
 
 interface PhotoEditorProps {
@@ -62,8 +63,10 @@ export function PhotoEditor({ session, isPro, onClose, onSave, onRequirePro, onT
   const [exportOptions, setExportOptions] = useState<ExportOptions>({ format: 'jpeg', quality: 0.92, maxDimension: 2048 });
   const [busy, setBusy] = useState<'save' | 'export' | 'share' | null>(null);
   const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
+  const [stageBounds, setStageBounds] = useState({ width: 0, height: 0 });
   const [adjustGroup, setAdjustGroup] = useState<'light' | 'effects'>('light');
   const sliderStart = useRef<EditSettings | null>(null);
+  const stageContainerRef = useRef<HTMLDivElement>(null);
   const currentPreset = getPreset(settings.presetId);
   const filter = useMemo(() => buildCssFilter(settings), [settings]);
   const isQuarterTurn = settings.rotation % 180 !== 0;
@@ -71,6 +74,22 @@ export function PhotoEditor({ session, isPro, onClose, onSave, onRequirePro, onT
   useEffect(() => {
     void loadImage(session.source).then((image) => setImageSize({ width: image.naturalWidth, height: image.naturalHeight })).catch(() => onToast('Fotoğraf yüklenemedi.', 'info'));
   }, [session.source, onToast]);
+
+  useEffect(() => {
+    const container = stageContainerRef.current;
+    if (!container) return;
+    const measure = () => {
+      const style = getComputedStyle(container);
+      const width = Math.max(0, container.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight));
+      const height = Math.max(0, container.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom));
+      setStageBounds((current) => current.width === width && current.height === height ? current : { width, height });
+    };
+    measure();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    observer?.observe(container);
+    window.addEventListener('resize', measure);
+    return () => { observer?.disconnect(); window.removeEventListener('resize', measure); };
+  }, []);
 
   const commit = (patch: Partial<EditSettings>, base?: EditSettings) => {
     setHistory((items) => [...items.slice(-39), base || settings]);
@@ -169,8 +188,17 @@ export function PhotoEditor({ session, isPro, onClose, onSave, onRequirePro, onT
   };
 
   const output = imageSize.width ? outputDimensions(imageSize.width, imageSize.height, settings, exportOptions.maxDimension) : null;
-  const aspect = settings.aspectRatio === 'original' ? undefined : settings.aspectRatio.replace(':', '/');
-  const transform = `rotate(${settings.rotation}deg) scale(${settings.flipHorizontal ? -1 : 1}, ${settings.flipVertical ? -1 : 1})${isQuarterTurn ? ' scale(.78)' : ''}`;
+  const preview = previewDimensions(stageBounds.width, stageBounds.height, imageSize.width, imageSize.height, settings);
+  const previewImageWidth = isQuarterTurn ? preview.height : preview.width;
+  const previewImageHeight = isQuarterTurn ? preview.width : preview.height;
+  const transform = `translate(-50%, -50%) rotate(${settings.rotation}deg) scale(${settings.flipHorizontal ? -1 : 1}, ${settings.flipVertical ? -1 : 1})`;
+  const previewImageStyle: React.CSSProperties = {
+    width: previewImageWidth || '100%',
+    height: previewImageHeight || '100%',
+    maxWidth: 'none',
+    objectFit: 'cover',
+    transform,
+  };
 
   return (
     <div className="editor-shell">
@@ -186,12 +214,12 @@ export function PhotoEditor({ session, isPro, onClose, onSave, onRequirePro, onT
             <span className="canvas-label"><i /> CANLI ÖNİZLEME</span>
             <div><button className={compare ? 'tool-button active' : 'tool-button'} onClick={() => { setCompare(!compare); setShowOriginal(false); }}><Columns2 size={16} /> <span>Önce / Sonra</span></button><button className={showGrid ? 'tool-button active' : 'tool-button'} onClick={() => setShowGrid(!showGrid)} aria-label="Izgara"><Grid3X3 size={17} /></button><button className="tool-button" onClick={share} disabled={busy !== null} aria-label="Paylaş">{busy === 'share' ? <LoaderCircle className="spin" size={17} /> : <Share2 size={17} />}</button></div>
           </div>
-          <div className="canvas-stage">
-            <div className="photo-stage" style={{ aspectRatio: aspect }}>
+          <div className="canvas-stage" ref={stageContainerRef}>
+            <div className="photo-stage" style={{ width: preview.width || '100%', height: preview.height || '100%', aspectRatio: preview.aspectRatio }}>
               <div className="photo-stage__image">
-                <img src={session.source} alt="Düzenlenen fotoğraf" style={{ filter, transform }} draggable={false} />
+                <img src={session.source} alt="Düzenlenen fotoğraf" style={{ ...previewImageStyle, filter }} draggable={false} />
               </div>
-              {(compare || showOriginal) && <div className="before-image" style={{ clipPath: showOriginal ? 'inset(0)' : `inset(0 ${100 - comparePosition}% 0 0)` }}><img src={session.source} alt="Düzenleme öncesi" style={{ transform }} draggable={false} /></div>}
+              {(compare || showOriginal) && <div className="before-image" style={{ clipPath: showOriginal ? 'inset(0)' : `inset(0 ${100 - comparePosition}% 0 0)` }}><img src={session.source} alt="Düzenleme öncesi" style={previewImageStyle} draggable={false} /></div>}
               {settings.vignette > 0 && !showOriginal && <div className="vignette-overlay" style={{ opacity: Math.min(1, settings.vignette / 100) }} />}
               {settings.grain > 0 && !showOriginal && <div className="grain-overlay" style={{ opacity: Math.min(0.65, settings.grain / 140) }} />}
               {!compare && <button className={`original-hold ${showOriginal ? 'active' : ''}`} onPointerDown={(event) => { event.preventDefault(); setShowOriginal(true); }} onPointerUp={() => setShowOriginal(false)} onPointerLeave={() => setShowOriginal(false)} onContextMenu={(event) => event.preventDefault()} aria-label="Orijinal fotoğrafı görmek için basılı tut"><Eye size={14} /><span>{showOriginal ? 'ORİJİNAL' : 'Basılı tut: Orijinal'}</span></button>}
@@ -238,6 +266,7 @@ export function PhotoEditor({ session, isPro, onClose, onSave, onRequirePro, onT
         </aside>
       </main>
 
+      {busy === 'share' && <div className="editor-share-status glass-modal" role="status"><MyVisionLogo variant="wordmark" size={34} /><LoaderCircle className="spin" size={22} /><strong>Görüşün paylaşıma hazırlanıyor</strong></div>}
       {exportOpen && <Modal title="Fotoğrafını dışa aktar" onClose={() => busy === null && setExportOpen(false)} className="export-modal">
         <div className="export-preview"><img src={session.source} alt="Dışa aktarılacak fotoğraf" style={{ filter }} /><span><Check size={15} /> Düzenlemeler uygulandı</span></div>
         <div className="export-field"><label>Dosya formatı</label><div className="format-options"><button className={exportOptions.format === 'jpeg' ? 'active' : ''} onClick={() => setExportOptions({ ...exportOptions, format: 'jpeg' })}><strong>JPG</strong><small>Paylaşım için ideal</small></button><button className={exportOptions.format === 'png' ? 'active' : ''} onClick={() => setExportOptions({ ...exportOptions, format: 'png' })}><strong>PNG</strong><small>Kayıpsız kalite</small></button></div></div>

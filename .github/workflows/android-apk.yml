@@ -62,7 +62,7 @@ jobs:
           npm run lint
 
       - name: Build and synchronize Android assets
-        run: npm run cap:sync
+        run: npm run assets && npm run cap:sync
 
       - name: Assemble APK
         working-directory: android
@@ -79,27 +79,27 @@ jobs:
           exit "$STATUS"
 
       - name: Rename APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk My-Vision-1.1.0-debug.apk
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk My-Vision-1.2.0-debug.apk
 
       - name: Create checksum
-        run: sha256sum My-Vision-1.1.0-debug.apk > My-Vision-1.1.0-debug.apk.sha256
+        run: sha256sum My-Vision-1.2.0-debug.apk > My-Vision-1.2.0-debug.apk.sha256
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: My-Vision-1.1.0-debug
+          name: My-Vision-1.2.0-debug
           path: |
-            My-Vision-1.1.0-debug.apk
-            My-Vision-1.1.0-debug.apk.sha256
+            My-Vision-1.2.0-debug.apk
+            My-Vision-1.2.0-debug.apk.sha256
           if-no-files-found: error
           retention-days: 30
 
       - name: Publish downloadable APK release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: my-vision-v1.1.0-debug
+          tag_name: my-vision-v1.2.0-debug
           target_commitish: arena/2abc0dfe-agent
-          name: My Vision v1.1.0 — Android APK
+          name: My Vision v1.2.0 — Android APK
           body: |
             My Vision fotoğraf stüdyosunun kurulabilir Android test sürümü.
 
@@ -108,7 +108,7 @@ jobs:
             - Derleme: debug imzalı, kurulabilir APK
             - Üretim: Play Store için imzalı AAB gerekir
 
-            **1.1.0 yenilikleri:** Huawei/çentik güvenli alanı, kamera dönüşü yerleşim düzeltmesi, güçlendirilmiş görünümler, canlı vinyet/gren, Netlik, Yumuşak odak ve basılı tutarak orijinali görme.
+            **1.2.0 yenilikleri:** Sarı-siyah Liquid Glass arayüz, tek kaynaklı göz/diyafram logosu, gerçek ve sürekli değişen Lorem Picsum keşfi, sahte örnek projelerin kaldırılması, güvenilir Orijinal/kare kırpma geçişleri ve siyah sistem çubukları.
 
             Android 7.0 ve üzeri cihazlara kurulabilir. Gerekirse kurulum sırasında bu kaynaktan uygulama yüklemeye izin verin. Pro önizleme ödeme almaz; gerçek Google Play satın alımı için RevenueCat yapılandırması gerekir.
 
@@ -117,5 +117,5 @@ jobs:
           draft: false
           overwrite_files: true
           files: |
-            My-Vision-1.1.0-debug.apk
-            My-Vision-1.1.0-debug.apk.sha256
+            My-Vision-1.2.0-debug.apk
+            My-Vision-1.2.0-debug.apk.sha256

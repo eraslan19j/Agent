@@ -48,6 +48,23 @@ export function normalizedRotation(rotation: number) {
   return ((rotation % 360) + 360) % 360;
 }
 
+export function previewDimensions(containerWidth: number, containerHeight: number, imageWidth: number, imageHeight: number, settings: Pick<EditSettings, 'aspectRatio' | 'rotation'>) {
+  if (containerWidth <= 0 || containerHeight <= 0 || imageWidth <= 0 || imageHeight <= 0) {
+    return { width: 0, height: 0, aspectRatio: 1 };
+  }
+  const crop = computeCrop(imageWidth, imageHeight, settings.aspectRatio);
+  const quarterTurn = normalizedRotation(settings.rotation) % 180 !== 0;
+  const outputWidth = quarterTurn ? crop.height : crop.width;
+  const outputHeight = quarterTurn ? crop.width : crop.height;
+  const aspectRatio = outputWidth / outputHeight;
+  const scale = Math.min(containerWidth / outputWidth, containerHeight / outputHeight);
+  return {
+    width: Math.max(1, Math.floor(outputWidth * scale)),
+    height: Math.max(1, Math.floor(outputHeight * scale)),
+    aspectRatio,
+  };
+}
+
 export function outputDimensions(width: number, height: number, settings: EditSettings, maxDimension: number) {
   const crop = computeCrop(width, height, settings.aspectRatio);
   const quarterTurn = normalizedRotation(settings.rotation) % 180 !== 0;

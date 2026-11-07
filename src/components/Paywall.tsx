@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { ArrowRight, Check, Crown, Infinity as InfinityIcon, LoaderCircle, LockKeyhole, RotateCcw, ShieldCheck, Sparkles, WandSparkles } from 'lucide-react';
+import { ArrowRight, Check, Infinity as InfinityIcon, LoaderCircle, LockKeyhole, RotateCcw, ShieldCheck, Sparkles, WandSparkles } from 'lucide-react';
 import { isNativeBillingAvailable } from '../lib/billing';
 import type { PlanInterval } from '../types';
 import { Modal } from './Modal';
+import { MyVisionLogo } from './MyVisionLogo';
 
 interface PaywallProps {
   onClose: () => void;
@@ -26,10 +27,10 @@ export function Paywall({ onClose, onPurchase, onRestore }: PaywallProps) {
 
   return (
     <Modal onClose={busy ? () => undefined : onClose} className="paywall-modal">
-      <div className="paywall-visual">
-        <img src="/images/santorini.jpg" alt="My Vision Pro görünümü" />
+      <div className="paywall-visual paywall-brand-visual">
         <div className="paywall-visual__overlay" />
-        <span className="paywall-logo"><Crown size={17} /> MY VISION <b>PRO</b></span>
+        <MyVisionLogo variant="wordmark" size={38} className="paywall-logo" />
+        <div className="paywall-aperture" aria-hidden="true"><MyVisionLogo size={170} /></div>
         <div><span className="eyebrow">YARATICILIĞIN TAM SÜRÜMÜ</span><h2>Vizyonun için<br /><em>her detay.</em></h2><p>Daha fazlasını yarat. Daha azına razı olma.</p></div>
       </div>
       <div className="paywall-content">

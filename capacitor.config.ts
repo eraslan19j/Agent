@@ -5,21 +5,21 @@ const config: CapacitorConfig = {
   appName: 'My Vision',
   webDir: 'dist',
   android: {
-    backgroundColor: '#0B0B0D',
+    backgroundColor: '#0A0A0A',
     allowMixedContent: false,
   },
   plugins: {
     SplashScreen: {
       launchShowDuration: 1200,
       launchAutoHide: true,
-      backgroundColor: '#0B0B0D',
+      backgroundColor: '#0A0A0A',
       androidSplashResourceName: 'splash',
       androidScaleType: 'CENTER_CROP',
       showSpinner: false,
     },
     StatusBar: {
-      style: 'DARK',
-      backgroundColor: '#0B0B0D',
+      style: 'LIGHT',
+      backgroundColor: '#0A0A0A',
       overlaysWebView: false,
     },
   },

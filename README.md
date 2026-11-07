@@ -16,6 +16,9 @@ My Vision; fotoğraf düzenleme, ilham keşfi, yerel proje arşivi ve Pro abonel
 - **Freemium:** Free özellikler, Pro paywall, aylık/yıllık plan ve satın alım geri yükleme
 - **Gizlilik:** Fotoğraf işleme cihazda; reklam takipçisi yok
 - **Native deneyim:** Android 7.0+, Huawei/HarmonyOS dahil çentik ve sistem çubuğu güvenli alanları, kamera dönüşü yerleşim koruması, özel ikonlar ve koyu tema
+- **1.2.0 tasarımı:** `#FFC400` sarı + `#0A0A0A` siyah Liquid Glass, tek SVG kaynaklı göz/diyafram logosu ve animasyonlu açılış
+- **Gerçek keşif:** Lorem Picsum üzerinden her seferinde değişen fotoğraflar, görünür fotoğrafçı/kaynak bilgisi ve stüdyoya aktarma
+- **Güvenilir kadraj:** Ölçülen önizleme geometrisi; Orijinal, kare ve 90° döndürme geçişlerinde siyah görüntü oluşmaz
 - **1.1.0 araçları:** Netlik, yumuşak odak, canlı vinyet/gren ve basılı tutarak orijinal fotoğrafı görüntüleme
 
 ## Hızlı başlangıç
@@ -37,7 +40,7 @@ npm run lint    # ESLint
 
 ## Android
 
-**Hazır test APK'sı:** [My Vision v1.1.0 debug APK](https://github.com/eraslan19j/Agent/releases/download/my-vision-v1.1.0-debug/My-Vision-1.1.0-debug.apk)
+**Hazır test APK'sı:** [My Vision v1.2.0 debug APK](https://github.com/eraslan19j/Agent/releases/download/my-vision-v1.2.0-debug/My-Vision-1.2.0-debug.apk)
 
 Yerel derleme gereksinimleri: JDK 21, Android Studio ve Android SDK 36.
 
@@ -60,12 +63,13 @@ cd android
 ```text
 src/
   components/       Ana sayfa, keşfet, projeler, profil, paywall ve editör
-  data/             Görünümler ve örnek galeri
+  brand/            Tek kaynaklı SVG logo ve marka renkleri
+  data/             Görünüm tanımları
   lib/              Canvas görüntü motoru, depolama, indirme ve RevenueCat
   types/            Ortak TypeScript tipleri
 android/            Native Capacitor Android projesi
 public/
-  images/           Yerel örnek fotoğraflar
+  icons/            Tek kaynaktan üretilen PWA ikonları
   privacy.html      Gizlilik politikası
   terms.html        Kullanım koşulları
 resources/          İkon ve splash kaynakları

@@ -8,6 +8,7 @@ import '@fontsource/manrope/latin-ext-700.css';
 import '@fontsource/manrope/latin-ext-800.css';
 import '@fontsource/instrument-serif/latin-ext-400.css';
 import './styles.css';
+import './liquid-glass.css';
 import App from './App';
 
 if (Capacitor.isNativePlatform()) document.documentElement.classList.add('native-android');

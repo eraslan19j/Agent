@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS } from '../data/presets';
-import { buildCssFilter, computeCrop, normalizedRotation, outputDimensions } from './imageEngine';
+import { buildCssFilter, computeCrop, normalizedRotation, outputDimensions, previewDimensions } from './imageEngine';
 
 describe('image engine geometry', () => {
   it('crops a landscape source to a centered square', () => {
@@ -33,6 +33,26 @@ describe('image engine geometry', () => {
   it('normalizes negative and repeated rotations', () => {
     expect(normalizedRotation(-90)).toBe(270);
     expect(normalizedRotation(450)).toBe(90);
+  });
+
+  it('restores a visible original preview after a square crop', () => {
+    const square = previewDimensions(500, 500, 1600, 900, { ...DEFAULT_SETTINGS, aspectRatio: '1:1' });
+    const original = previewDimensions(500, 500, 1600, 900, { ...DEFAULT_SETTINGS, aspectRatio: 'original' });
+    expect(square).toMatchObject({ width: 500, height: 500, aspectRatio: 1 });
+    expect(original.width).toBe(500);
+    expect(original.height).toBe(281);
+    expect(original.aspectRatio).toBeCloseTo(16 / 9);
+  });
+
+  it('fits rotated previews without arbitrary shrinking or black side gaps', () => {
+    const preview = previewDimensions(600, 400, 1600, 900, { ...DEFAULT_SETTINGS, rotation: 90 });
+    expect(preview).toMatchObject({ width: 225, height: 400 });
+    expect(preview.aspectRatio).toBeCloseTo(9 / 16);
+  });
+
+  it('keeps portrait previews visible in a narrow mobile stage', () => {
+    const preview = previewDimensions(300, 500, 1200, 1800, DEFAULT_SETTINGS);
+    expect(preview).toMatchObject({ width: 300, height: 450 });
   });
 });
 
