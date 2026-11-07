@@ -2,7 +2,7 @@
 
 ## 1. Yayın öncesi yapılandırma
 
-1. Node.js 20+, JDK 17 ve Android Studio'nun güncel sürümünü kurun.
+1. Node.js 20+, JDK 21 ve Android Studio'nun güncel sürümünü kurun.
 2. Bağımlılıkları kurun: `npm ci`
 3. `.env.example` dosyasını `.env.production` olarak kopyalayın.
 4. RevenueCat Dashboard'da Google Play uygulaması oluşturun ve **public Android SDK key** değerini `VITE_REVENUECAT_ANDROID_API_KEY` alanına yazın. Secret API key'i uygulamaya koymayın.

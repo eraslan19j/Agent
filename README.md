@@ -36,7 +36,7 @@ npm run lint    # ESLint
 
 ## Android
 
-Gereksinimler: JDK 17, Android Studio ve Android SDK 36.
+Gereksinimler: JDK 21, Android Studio ve Android SDK 36.
 
 ```bash
 npm run cap:sync
