@@ -66,7 +66,17 @@ jobs:
 
       - name: Assemble APK
         working-directory: android
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        shell: bash
+        run: |
+          set +e
+          ./gradlew assembleDebug --no-daemon --stacktrace > ../android-build.log 2>&1
+          STATUS=$?
+          cat ../android-build.log
+          if [ "$STATUS" -ne 0 ]; then
+            ESCAPED_LOG=$(tail -n 45 ../android-build.log | sed -e 's/%/%25/g' -e 's/\r/%0D/g' | sed ':a;N;$!ba;s/\n/%0A/g')
+            echo "::error::${ESCAPED_LOG}"
+          fi
+          exit "$STATUS"
 
       - name: Rename APK
         run: cp android/app/build/outputs/apk/debug/app-debug.apk My-Vision-1.0.0-debug.apk
