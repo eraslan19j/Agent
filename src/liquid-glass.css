@@ -27,7 +27,10 @@ body { color: var(--text); overscroll-behavior-y: none; }
 .app-shell { background: radial-gradient(circle at 82% -8%, rgba(var(--brand-rgb), .065), transparent 29%), var(--brand-black); }
 ::selection { background: var(--brand-yellow); color: var(--brand-black); }
 :focus-visible { outline-color: var(--brand-yellow); }
-.my-vision-logo { display: block; flex: 0 0 auto; overflow: visible; }
+.my-vision-logo { display: inline-flex; align-items: center; flex: 0 0 auto; gap: calc(var(--logo-size) * .22); overflow: visible; }
+.my-vision-logo > img { width: var(--logo-size); height: var(--logo-size); flex: 0 0 auto; border-radius: 23%; object-fit: contain; }
+.my-vision-logo__word { color: var(--brand-white); font-size: calc(var(--logo-size) * .43); font-weight: 800; letter-spacing: calc(var(--logo-size) * -.025); white-space: nowrap; }
+.my-vision-logo__dot { color: var(--brand-yellow); }
 .brand-lockup { filter: drop-shadow(0 6px 20px rgba(var(--brand-rgb), .06)); }
 .accent-dot { color: var(--brand-yellow); }
 
@@ -204,6 +207,7 @@ body { color: var(--text); overscroll-behavior-y: none; }
   .hero-actions .button { min-height: 50px; padding: 0 15px; font-size: 10px; }
   .hero-monogram { right: 22px; top: 72px; transform: rotate(-7deg); }
   .hero-monogram .my-vision-logo { width: 86px; height: 86px; }
+  .hero-monogram .my-vision-logo > img { width: 86px; height: 86px; }
   .hero-orbit { right: -190px; top: -140px; }
   .quick-card { border-radius: 18px; }
   .first-project { padding: 24px 19px; flex-direction: column; align-items: flex-start; gap: 17px; }

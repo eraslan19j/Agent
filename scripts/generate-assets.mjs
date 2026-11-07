@@ -1,85 +1,110 @@
 import sharp from 'sharp';
 import { mkdir, readdir, writeFile } from 'node:fs/promises';
-import { createLogoSvg, SYMBOL_CONTENT, WORDMARK_CONTENT } from '../src/brand/logo.mjs';
 
+const SOURCE = 'resources/generated-vision-icon.png';
+const YELLOW = '#FFC400';
+const BLACK = '#0A0A0A';
+const WHITE = '#F7F7F5';
 await mkdir('resources', { recursive: true });
 await mkdir('public/icons', { recursive: true });
 await mkdir('store', { recursive: true });
 
-const symbol = (size = 1024, background = true) => Buffer.from(createLogoSvg('symbol', size, background));
-await writeFile('public/favicon.svg', createLogoSvg('symbol', 64));
-await writeFile('public/logo.svg', createLogoSvg('symbol', 64));
-await writeFile('public/logo-wordmark.svg', createLogoSvg('wordmark', 64));
+// The selected AI-generated image is the sole symbol source. We only separate
+// its luminance into an antialiased alpha channel and normalize brand colors.
+const { data, info } = await sharp(SOURCE).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+const alpha = Buffer.alloc(info.width * info.height * 4);
+for (let index = 0; index < data.length; index += 4) {
+  const luminance = data[index] * .2126 + data[index + 1] * .7152 + data[index + 2] * .0722;
+  const opacity = Math.max(0, Math.min(1, (174 - luminance) / 116));
+  alpha[index] = 10; alpha[index + 1] = 10; alpha[index + 2] = 10;
+  alpha[index + 3] = Math.round(opacity * 255);
+}
+const blackSymbol = await sharp(alpha, { raw: info }).png().toBuffer();
+const yellowAlpha = Buffer.from(alpha);
+for (let index = 0; index < yellowAlpha.length; index += 4) {
+  yellowAlpha[index] = 255; yellowAlpha[index + 1] = 196; yellowAlpha[index + 2] = 0;
+}
+const yellowSymbol = await sharp(yellowAlpha, { raw: info }).png().toBuffer();
 
-await sharp(symbol()).png().toFile('resources/icon-only.png');
-await sharp({ create: { width: 1024, height: 1024, channels: 4, background: '#FFC400' } }).png().toFile('resources/icon-background.png');
-const foreground = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024"><g transform="translate(112 112) scale(.78)">${SYMBOL_CONTENT}</g></svg>`);
-await sharp(foreground).png().toFile('resources/icon-foreground.png');
+function canvas(size, color = { r: 0, g: 0, b: 0, alpha: 0 }) {
+  return sharp({ create: { width: size, height: size, channels: 4, background: color } });
+}
+async function fullIcon(size) {
+  return canvas(size, YELLOW).composite([{ input: await sharp(blackSymbol).resize(size, size).png().toBuffer() }]).png().toBuffer();
+}
+async function foreground(size, color = 'black') {
+  const input = await sharp(color === 'yellow' ? yellowSymbol : blackSymbol).resize(Math.round(size * .78), Math.round(size * .78)).png().toBuffer();
+  return canvas(size).composite([{ input, gravity: 'center' }]).png().toBuffer();
+}
+async function roundIcon(size) {
+  const mask = Buffer.from(`<svg width="${size}" height="${size}"><circle cx="${size / 2}" cy="${size / 2}" r="${size / 2}" fill="white"/></svg>`);
+  const base = await canvas(size, YELLOW).composite([{ input: mask, blend: 'dest-in' }]).png().toBuffer();
+  return sharp(base).composite([{ input: await sharp(blackSymbol).resize(size, size).png().toBuffer() }]).png().toBuffer();
+}
 
-const splashSvg = Buffer.from(`<svg width="2732" height="2732" viewBox="0 0 2732 2732" xmlns="http://www.w3.org/2000/svg">
-  <rect width="2732" height="2732" fill="#0A0A0A"/>
-  <circle cx="1366" cy="1250" r="620" fill="#FFC400" opacity=".045"/>
-  <circle cx="1366" cy="1250" r="410" fill="#FFC400" opacity=".04"/>
-  <g transform="translate(806 1080) scale(5)"><rect width="64" height="64" rx="15" fill="#FFC400"/>${WORDMARK_CONTENT}</g>
-  <text x="1366" y="1595" text-anchor="middle" fill="#8C8C88" font-family="sans-serif" font-size="25" letter-spacing="9">GÖRÜŞÜNÜ YARAT</text>
-</svg>`);
-await sharp(splashSvg).png().toFile('resources/splash.png');
-await sharp(splashSvg).png().toFile('resources/splash-dark.png');
-await sharp(symbol()).resize(192, 192).png().toFile('public/icons/icon-192.png');
-await sharp(symbol()).resize(512, 512).png().toFile('public/icons/icon-512.png');
-await sharp(symbol()).resize(512, 512).png().toFile('store/icon-512.png');
+await writeFile('public/favicon.png', await fullIcon(64));
+await writeFile('public/favicon-32.png', await fullIcon(32));
+await writeFile('public/logo.png', await fullIcon(512));
+await writeFile('public/icons/icon-192.png', await fullIcon(192));
+await writeFile('public/icons/icon-512.png', await fullIcon(512));
+await writeFile('public/icons/icon-maskable-512.png', await fullIcon(512));
+await writeFile('store/icon-512.png', await fullIcon(512));
+await writeFile('resources/icon-only.png', await fullIcon(1024));
+await writeFile('resources/icon-background.png', await canvas(1024, YELLOW).png().toBuffer());
+await writeFile('resources/icon-foreground.png', await foreground(1024));
+await writeFile('resources/icon-monochrome.png', await foreground(1024));
 
-const outlineSymbol = SYMBOL_CONTENT.replaceAll('#0A0A0A', '#FFC400');
-const featureSvg = Buffer.from(`<svg width="1024" height="500" viewBox="0 0 1024 500" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <radialGradient id="glow"><stop stop-color="#FFC400" stop-opacity=".13"/><stop offset="1" stop-color="#0A0A0A" stop-opacity="0"/></radialGradient>
-    <linearGradient id="line" x1="0" x2="1"><stop stop-color="#FFC400" stop-opacity=".35"/><stop offset="1" stop-color="#FFC400" stop-opacity="0"/></linearGradient>
-  </defs>
-  <rect width="1024" height="500" fill="#0A0A0A"/>
-  <circle cx="830" cy="250" r="370" fill="url(#glow)"/>
-  <g transform="translate(675 70) scale(5.5)" opacity=".18">${outlineSymbol}</g>
-  <g transform="translate(62 54) scale(.85)"><rect width="64" height="64" rx="15" fill="#FFC400"/>${WORDMARK_CONTENT}</g>
-  <rect x="64" y="163" width="80" height="3" fill="url(#line)"/>
-  <text x="64" y="253" fill="#F7F7F5" font-family="sans-serif" font-size="66" font-weight="700" letter-spacing="-2">GÖRÜŞÜNÜ</text>
-  <text x="64" y="326" fill="#FFC400" font-family="sans-serif" font-size="66" font-weight="700" letter-spacing="-2">YARAT.</text>
-  <text x="68" y="380" fill="#A6A6A1" font-family="sans-serif" font-size="20">Liquid Glass fotoğraf stüdyon. Her zaman yanında.</text>
-  <rect x="66" y="422" width="200" height="36" rx="18" fill="#FFC400"/>
-  <text x="166" y="446" text-anchor="middle" fill="#0A0A0A" font-family="sans-serif" font-size="13" font-weight="700" letter-spacing="2">PHOTO STUDIO</text>
-</svg>`);
-await sharp(featureSvg).png().toFile('store/feature-graphic.png');
-
-// Keep native launcher icons in sync without adding an asset-generation runtime dependency.
-const androidRes = 'android/app/src/main/res';
+const res = 'android/app/src/main/res';
 const densities = { 'mipmap-ldpi': 36, 'mipmap-mdpi': 48, 'mipmap-hdpi': 72, 'mipmap-xhdpi': 96, 'mipmap-xxhdpi': 144, 'mipmap-xxxhdpi': 192 };
 for (const [folder, size] of Object.entries(densities)) {
-  const directory = `${androidRes}/${folder}`;
+  const directory = `${res}/${folder}`;
   await mkdir(directory, { recursive: true });
-  await sharp(symbol()).resize(size, size).png().toFile(`${directory}/ic_launcher.png`);
-  await sharp({ create: { width: size, height: size, channels: 4, background: '#FFC400' } }).png().toFile(`${directory}/ic_launcher_background.png`);
-  const foregroundSvg = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 64 64"><g transform="translate(7 7) scale(.78)">${SYMBOL_CONTENT}</g></svg>`);
-  await sharp(foregroundSvg).png().toFile(`${directory}/ic_launcher_foreground.png`);
-  const roundSvg = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 64 64"><circle cx="32" cy="32" r="32" fill="#FFC400"/>${SYMBOL_CONTENT}</svg>`);
-  await sharp(roundSvg).png().toFile(`${directory}/ic_launcher_round.png`);
+  await writeFile(`${directory}/ic_launcher.png`, await fullIcon(size));
+  await writeFile(`${directory}/ic_launcher_round.png`, await roundIcon(size));
+  await writeFile(`${directory}/ic_launcher_background.png`, await canvas(size, YELLOW).png().toBuffer());
+  await writeFile(`${directory}/ic_launcher_foreground.png`, await foreground(size));
+  await writeFile(`${directory}/ic_launcher_monochrome.png`, await foreground(size));
+}
+await writeFile(`${res}/drawable/splash_icon.png`, await foreground(512, 'yellow'));
+await writeFile(`${res}/drawable/splash_icon_dark.png`, await foreground(512));
+
+async function brandText(color = WHITE) {
+  return Buffer.from(`<svg width="350" height="130" xmlns="http://www.w3.org/2000/svg"><text x="0" y="84" fill="${color}" font-family="Manrope,Arial,sans-serif" font-size="72" font-weight="800" letter-spacing="-3">My Vision</text><rect x="332" y="65" width="12" height="12" rx="2" fill="${YELLOW}"/></svg>`);
 }
 
-function nativeSplash(width, height) {
-  const scale = Math.min(width * .72 / 224, height * .34 / 64);
-  const x = (width - 224 * scale) / 2;
-  const y = (height - 64 * scale) / 2 - height * .025;
-  return Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
-    <rect width="${width}" height="${height}" fill="#0A0A0A"/>
-    <circle cx="${width / 2}" cy="${height / 2}" r="${Math.min(width,height) * .48}" fill="#FFC400" opacity=".045"/>
-    <g transform="translate(${x} ${y}) scale(${scale})"><rect width="64" height="64" rx="15" fill="#FFC400"/>${WORDMARK_CONTENT}</g>
-    <text x="${width / 2}" y="${y + 64 * scale + Math.max(25,height * .055)}" text-anchor="middle" fill="#92928C" font-family="sans-serif" font-size="${Math.max(8,width * .018)}" letter-spacing="${Math.max(2,width * .005)}">GÖRÜŞÜNÜ YARAT</text>
-  </svg>`);
+async function splash(width, height, dark = true, amoled = false) {
+  const background = dark ? (amoled ? '#000000' : BLACK) : WHITE;
+  const symbol = await sharp(dark ? yellowSymbol : blackSymbol).resize(Math.round(Math.min(width, height) * .23), Math.round(Math.min(width, height) * .23)).png().toBuffer();
+  const textWidth = Math.round(Math.min(width, height) * .45);
+  const text = await sharp(await brandText(dark ? WHITE : BLACK)).resize(textWidth, Math.round(textWidth * 130 / 350)).png().toBuffer();
+  return sharp({ create: { width, height, channels: 4, background } }).composite([
+    { input: symbol, top: Math.round(height * .34), left: Math.round((width - Math.min(width, height) * .23) / 2) },
+    { input: text, top: Math.round(height * .34 + Math.min(width, height) * .26), left: Math.round((width - textWidth) / 2) },
+  ]).png().toBuffer();
 }
-for (const entry of await readdir(androidRes, { withFileTypes: true })) {
+await writeFile('resources/splash.png', await splash(2732, 2732));
+await writeFile('resources/splash-dark.png', await splash(2732, 2732));
+for (const entry of await readdir(res, { withFileTypes: true })) {
   if (!entry.isDirectory() || !entry.name.startsWith('drawable')) continue;
-  const path = `${androidRes}/${entry.name}/splash.png`;
+  const path = `${res}/${entry.name}/splash.png`;
   try {
     const { width, height } = await sharp(path).metadata();
-    if (width && height) await sharp(nativeSplash(width, height)).png().toFile(path);
-  } catch { /* Directory has no splash variant. */ }
+    if (width && height) await writeFile(path, await splash(width, height));
+    if (width && height && !entry.name.includes('night')) await writeFile(`${res}/${entry.name}/splash_amoled.png`, await splash(width, height, true, true));
+    if (width && height && !entry.name.includes('night')) await writeFile(`${res}/${entry.name}/splash_light.png`, await splash(width, height, false));
+  } catch { /* Not a splash directory. */ }
 }
 
-console.log('Single-source eye/aperture identity exported to app, Android, PWA, splash and Play Store assets.');
+const featureBase = Buffer.from(`<svg width="1024" height="500" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1024" height="500" fill="${BLACK}"/><circle cx="860" cy="250" r="310" fill="${YELLOW}" opacity=".08"/>
+  <text x="190" y="119" fill="${WHITE}" font-family="Arial,sans-serif" font-size="46" font-weight="700" letter-spacing="-2">My Vision</text>
+  <text x="65" y="265" fill="${WHITE}" font-family="Arial,sans-serif" font-size="66" font-weight="700" letter-spacing="-2">GÖRÜŞÜNÜ</text>
+  <text x="65" y="338" fill="${YELLOW}" font-family="Arial,sans-serif" font-size="66" font-weight="700" letter-spacing="-2">YARAT.</text>
+  <text x="68" y="390" fill="#A6A6A1" font-family="Arial,sans-serif" font-size="20">Cihazında çalışan yaratıcı fotoğraf stüdyon.</text>
+  <rect x="66" y="432" width="210" height="36" rx="18" fill="${YELLOW}"/><text x="171" y="456" text-anchor="middle" fill="${BLACK}" font-family="Arial,sans-serif" font-size="13" font-weight="700" letter-spacing="2">PHOTO STUDIO</text>
+</svg>`);
+await sharp(featureBase).composite([
+  { input: await fullIcon(100), top: 45, left: 65 },
+  { input: await foreground(440, 'yellow'), top: 32, left: 610 },
+]).png().toFile('store/feature-graphic.png');
+console.log('Generated-image identity exported to Android, monochrome, splash, PWA, favicon and Play Store assets.');

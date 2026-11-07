@@ -38,3 +38,12 @@
 - EXIF orientation=6, 400×200 JPEG: çıktı doğru şekilde 200×400.
 - Dikey 1200×1600 ve panorama 4000×1000: oran korundu, merkezleme ve viewport değişimi doğrulandı.
 - Proje kaydet/yeniden aç: Noir %85 ve proje kimliği korunarak geri yüklendi.
+
+## Aşama 2 — Üretilen görselden marka sistemi
+
+- Kodla çizilen eski SVG göz/diyafram kaldırıldı; seçilen AI üretimi raster ikon `resources/generated-vision-icon.png` tek kaynak oldu.
+- Kaynak görselden antialias alfa maskesi çıkarıldı ve ana renkler `#FFC400` / `#0A0A0A` olarak normalize edildi.
+- Android adaptive foreground/background, yuvarlak ikon, Android 13 monochrome, 192/512 PWA, maskable PWA, 32/64 favicon, Play Store 512 ve 1024×500 öne çıkan görsel üretildi.
+- Uygulama içi logo bileşeni artık üretilen raster ikonu ve erişilebilir metin lockup’ını kullanıyor.
+- Native splash varyantları ve mağaza kapağı yeni ikonla yenilendi; 48 px okunabilirlik ve mobil taşma kontrol edildi.
+- Production build, 22 test ve ESLint başarılı.
