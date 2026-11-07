@@ -15,7 +15,8 @@ My Vision; fotoğraf düzenleme, ilham keşfi, yerel proje arşivi ve Pro abonel
 - **Kamera ve galeri:** JPG, PNG ve WebP; büyük görselleri güvenli boyuta hazırlama
 - **Freemium:** Free özellikler, Pro paywall, aylık/yıllık plan ve satın alım geri yükleme
 - **Gizlilik:** Fotoğraf işleme cihazda; reklam takipçisi yok
-- **Native deneyim:** Android 7.0+, özel ikonlar, splash, koyu tema, responsive tablet/masaüstü düzeni
+- **Native deneyim:** Android 7.0+, Huawei/HarmonyOS dahil çentik ve sistem çubuğu güvenli alanları, kamera dönüşü yerleşim koruması, özel ikonlar ve koyu tema
+- **1.1.0 araçları:** Netlik, yumuşak odak, canlı vinyet/gren ve basılı tutarak orijinal fotoğrafı görüntüleme
 
 ## Hızlı başlangıç
 
@@ -36,7 +37,7 @@ npm run lint    # ESLint
 
 ## Android
 
-**Hazır test APK'sı:** [My Vision v1.0.0 debug APK](https://github.com/eraslan19j/Agent/releases/download/my-vision-v1.0.0-debug/My-Vision-1.0.0-debug.apk)
+**Hazır test APK'sı:** [My Vision v1.1.0 debug APK](https://github.com/eraslan19j/Agent/releases/download/my-vision-v1.1.0-debug/My-Vision-1.1.0-debug.apk)
 
 Yerel derleme gereksinimleri: JDK 21, Android Studio ve Android SDK 36.
 

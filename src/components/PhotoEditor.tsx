@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ArrowLeft, Check, CircleGauge, Columns2, Contrast, Crop, Download,
+  ArrowLeft, Check, CircleGauge, Columns2, Contrast, Crop, Download, Eye, Focus,
   FlipHorizontal2, FlipVertical2, Grid3X3, Image as ImageIcon, LoaderCircle,
   LockKeyhole, Redo2, RotateCcw, RotateCw, Save, Share2, SlidersHorizontal,
-  Sparkles, Sun, Thermometer, Undo2, WandSparkles,
+  Sparkles, Sun, Thermometer, Undo2, WandSparkles, Waves,
 } from 'lucide-react';
 import { AUTO_ENHANCE_SETTINGS, getPreset, PRESETS } from '../data/presets';
 import { buildCssFilter, createThumbnail, freshSettings, loadImage, outputDimensions, renderPhoto } from '../lib/imageEngine';
@@ -40,6 +40,8 @@ const adjustments = [
 ];
 
 const effects = [
+  { key: 'clarity' as const, label: 'Netlik', min: -50, max: 100, icon: Focus },
+  { key: 'blur' as const, label: 'Yumuşak odak', min: 0, max: 20, icon: Waves, pro: true },
   { key: 'fade' as const, label: 'Solma', min: 0, max: 100, icon: ImageIcon },
   { key: 'vignette' as const, label: 'Vinyet', min: 0, max: 100, icon: CircleGauge },
   { key: 'grain' as const, label: 'Film greni', min: 0, max: 100, icon: Grid3X3, pro: true },
@@ -53,6 +55,7 @@ export function PhotoEditor({ session, isPro, onClose, onSave, onRequirePro, onT
   const [name, setName] = useState(session.name);
   const [projectId, setProjectId] = useState(session.projectId);
   const [compare, setCompare] = useState(false);
+  const [showOriginal, setShowOriginal] = useState(false);
   const [comparePosition, setComparePosition] = useState(50);
   const [showGrid, setShowGrid] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
@@ -104,10 +107,21 @@ export function PhotoEditor({ session, isPro, onClose, onSave, onRequirePro, onT
     setFuture((items) => items.slice(1));
   };
 
+  useEffect(() => {
+    const releaseOriginal = () => setShowOriginal(false);
+    window.addEventListener('pointerup', releaseOriginal);
+    window.addEventListener('pointercancel', releaseOriginal);
+    return () => {
+      window.removeEventListener('pointerup', releaseOriginal);
+      window.removeEventListener('pointercancel', releaseOriginal);
+    };
+  }, []);
+
   const selectPreset = (presetId: string) => {
     const preset = getPreset(presetId);
     if (preset.pro && !isPro) { onRequirePro(); return; }
-    commit({ presetId, intensity: presetId === 'original' ? 0 : Math.max(settings.intensity, 70) });
+    commit({ presetId, intensity: presetId === 'original' ? 0 : 85 });
+    onToast(presetId === 'original' ? 'Temel görünüme dönüldü.' : `${preset.name} fotoğrafına uygulandı.`);
   };
 
   const save = async () => {
@@ -170,14 +184,17 @@ export function PhotoEditor({ session, isPro, onClose, onSave, onRequirePro, onT
         <section className="canvas-panel">
           <div className="canvas-toolbar">
             <span className="canvas-label"><i /> CANLI ÖNİZLEME</span>
-            <div><button className={compare ? 'tool-button active' : 'tool-button'} onClick={() => setCompare(!compare)}><Columns2 size={16} /> <span>Önce / Sonra</span></button><button className={showGrid ? 'tool-button active' : 'tool-button'} onClick={() => setShowGrid(!showGrid)} aria-label="Izgara"><Grid3X3 size={17} /></button><button className="tool-button" onClick={share} disabled={busy !== null} aria-label="Paylaş">{busy === 'share' ? <LoaderCircle className="spin" size={17} /> : <Share2 size={17} />}</button></div>
+            <div><button className={compare ? 'tool-button active' : 'tool-button'} onClick={() => { setCompare(!compare); setShowOriginal(false); }}><Columns2 size={16} /> <span>Önce / Sonra</span></button><button className={showGrid ? 'tool-button active' : 'tool-button'} onClick={() => setShowGrid(!showGrid)} aria-label="Izgara"><Grid3X3 size={17} /></button><button className="tool-button" onClick={share} disabled={busy !== null} aria-label="Paylaş">{busy === 'share' ? <LoaderCircle className="spin" size={17} /> : <Share2 size={17} />}</button></div>
           </div>
           <div className="canvas-stage">
             <div className="photo-stage" style={{ aspectRatio: aspect }}>
               <div className="photo-stage__image">
                 <img src={session.source} alt="Düzenlenen fotoğraf" style={{ filter, transform }} draggable={false} />
               </div>
-              {compare && <div className="before-image" style={{ clipPath: `inset(0 ${100 - comparePosition}% 0 0)` }}><img src={session.source} alt="Düzenleme öncesi" style={{ transform }} draggable={false} /></div>}
+              {(compare || showOriginal) && <div className="before-image" style={{ clipPath: showOriginal ? 'inset(0)' : `inset(0 ${100 - comparePosition}% 0 0)` }}><img src={session.source} alt="Düzenleme öncesi" style={{ transform }} draggable={false} /></div>}
+              {settings.vignette > 0 && !showOriginal && <div className="vignette-overlay" style={{ opacity: Math.min(1, settings.vignette / 100) }} />}
+              {settings.grain > 0 && !showOriginal && <div className="grain-overlay" style={{ opacity: Math.min(0.65, settings.grain / 140) }} />}
+              {!compare && <button className={`original-hold ${showOriginal ? 'active' : ''}`} onPointerDown={(event) => { event.preventDefault(); setShowOriginal(true); }} onPointerUp={() => setShowOriginal(false)} onPointerLeave={() => setShowOriginal(false)} onContextMenu={(event) => event.preventDefault()} aria-label="Orijinal fotoğrafı görmek için basılı tut"><Eye size={14} /><span>{showOriginal ? 'ORİJİNAL' : 'Basılı tut: Orijinal'}</span></button>}
               {showGrid && <div className="composition-grid"><i /><i /><i /><i /></div>}
               {compare && <><span className="compare-label compare-label--before">ÖNCE</span><span className="compare-label compare-label--after">SONRA</span><div className="compare-line" style={{ left: `${comparePosition}%` }}><span><Columns2 size={16} /></span></div><input className="compare-range" type="range" min="0" max="100" value={comparePosition} onChange={(event) => setComparePosition(Number(event.target.value))} aria-label="Önce ve sonra karşılaştırması" /></>}
               <span className="preset-indicator">{currentPreset.name}{settings.intensity > 0 && currentPreset.id !== 'original' ? ` · ${settings.intensity}%` : ''}</span>
@@ -196,8 +213,8 @@ export function PhotoEditor({ session, isPro, onClose, onSave, onRequirePro, onT
             {activeTab === 'looks' && <div className="looks-panel">
               <div className="panel-heading"><div><span className="eyebrow">İMZA KOLEKSİYONU</span><h3>Görünümünü seç</h3></div><span>{PRESETS.length} stil</span></div>
               <div className="editor-presets">
-                {PRESETS.map((preset) => <button key={preset.id} className={settings.presetId === preset.id ? 'editor-preset active' : 'editor-preset'} onClick={() => selectPreset(preset.id)}>
-                  <div><img src={preset.image} alt="" style={{ filter: buildCssFilter({ ...freshSettings(), presetId: preset.id }) }} />{preset.pro && !isPro && <span className="preset-lock"><LockKeyhole size={12} /></span>}{settings.presetId === preset.id && <span className="preset-check"><Check size={13} /></span>}</div><span>{preset.name}</span>
+                {PRESETS.map((preset) => <button key={preset.id} className={settings.presetId === preset.id ? 'editor-preset active' : 'editor-preset'} onClick={(event) => { selectPreset(preset.id); event.currentTarget.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' }); }}>
+                  <div><img src={session.source} alt={`${preset.name} önizlemesi`} style={{ filter: buildCssFilter({ ...freshSettings(), presetId: preset.id, intensity: 85 }) }} />{preset.pro && !isPro && <span className="preset-lock"><LockKeyhole size={12} /></span>}{settings.presetId === preset.id && <span className="preset-check"><Check size={13} /></span>}</div><span>{preset.name}</span>
                 </button>)}
               </div>
               {settings.presetId !== 'original' && <div className="intensity-control"><EditorSlider label="Görünüm yoğunluğu" value={settings.intensity} min={0} max={100} onChange={(value) => updateSlider('intensity', value)} onStart={() => { sliderStart.current = settings; }} onEnd={endSlider} onReset={() => commit({ intensity: 100 })} /></div>}

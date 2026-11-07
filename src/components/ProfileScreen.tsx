@@ -41,7 +41,7 @@ export function ProfileScreen({ projects, isPro, onPro, onInfo, onNotifications,
         <span className="eyebrow">DESTEK</span>
         <div className="settings-card">
           <button onClick={() => onInfo('help')}><span className="settings-icon"><CircleHelp size={19} /></span><span><strong>Yardım merkezi</strong><small>Sık sorulan sorular ve ipuçları</small></span><ChevronRight size={17} /></button>
-          <button onClick={() => onInfo('about')}><span className="settings-icon"><FileText size={19} /></span><span><strong>My Vision hakkında</strong><small>Sürüm 1.0.0 · koşullar ve lisanslar</small></span><ChevronRight size={17} /></button>
+          <button onClick={() => onInfo('about')}><span className="settings-icon"><FileText size={19} /></span><span><strong>My Vision hakkında</strong><small>Sürüm 1.1.0 · koşullar ve lisanslar</small></span><ChevronRight size={17} /></button>
           <a href="mailto:support@myvision.app?subject=My%20Vision%20geri%20bildirim"><span className="settings-icon"><Star size={19} /></span><span><strong>Geri bildirim gönder</strong><small>Birlikte daha iyiye taşıyalım</small></span><ChevronRight size={17} /></a>
           {isPro && <button onClick={onRestore}><span className="settings-icon"><RotateCcw size={19} /></span><span><strong>Satın alımı geri yükle</strong><small>Mevcut Google Play aboneliğini doğrula</small></span><ChevronRight size={17} /></button>}
         </div>

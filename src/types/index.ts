@@ -30,6 +30,8 @@ export interface EditSettings {
   brightness: number;
   contrast: number;
   saturation: number;
+  clarity: number;
+  blur: number;
   temperature: number;
   highlights: number;
   shadows: number;

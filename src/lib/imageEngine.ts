@@ -14,17 +14,22 @@ export function buildCssFilter(
   settings: EditSettings,
   preset: PhotoPreset = getPreset(settings.presetId),
   includeTemperature = true,
+  includeSelectiveLight = true,
 ): string {
-  const amount = settings.intensity / 100;
-  const brightness = interpolate(1, preset.tone.brightness, amount) * settings.brightness / 100 * (1 + settings.exposure / 160);
-  const contrast = interpolate(1, preset.tone.contrast, amount) * settings.contrast / 100;
+  // interpolate() expects the 0–100 UI value and performs normalization once.
+  const amount = Math.min(100, Math.max(0, settings.intensity));
+  const clarity = settings.clarity ?? 0;
+  const blur = settings.blur ?? 0;
+  const selectiveLight = includeSelectiveLight ? 1 + settings.shadows / 520 + settings.highlights / 650 : 1;
+  const brightness = interpolate(1, preset.tone.brightness, amount) * settings.brightness / 100 * (1 + settings.exposure / 160) * selectiveLight;
+  const contrast = interpolate(1, preset.tone.contrast, amount) * settings.contrast / 100 * (1 + clarity / 220);
   const saturation = interpolate(1, preset.tone.saturation, amount) * settings.saturation / 100;
   const grayscale = interpolate(0, preset.tone.grayscale, amount);
   const sepia = interpolate(0, preset.tone.sepia, amount) + (includeTemperature ? Math.max(0, settings.temperature) / 650 : 0);
   const hueRotate = interpolate(0, preset.tone.hueRotate, amount) + (includeTemperature ? Math.min(0, settings.temperature) / 12 : 0);
   const fadeContrast = 1 - settings.fade / 450;
 
-  return `brightness(${Math.max(0, brightness).toFixed(3)}) contrast(${Math.max(0, contrast * fadeContrast).toFixed(3)}) saturate(${Math.max(0, saturation).toFixed(3)}) grayscale(${grayscale.toFixed(3)}) sepia(${Math.max(0, sepia).toFixed(3)}) hue-rotate(${hueRotate.toFixed(1)}deg)`;
+  return `brightness(${Math.max(0, brightness).toFixed(3)}) contrast(${Math.max(0, contrast * fadeContrast).toFixed(3)}) saturate(${Math.max(0, saturation).toFixed(3)}) grayscale(${grayscale.toFixed(3)}) sepia(${Math.max(0, sepia).toFixed(3)}) hue-rotate(${hueRotate.toFixed(1)}deg) blur(${Math.max(0, blur / 10).toFixed(1)}px)`;
 }
 
 export function computeCrop(width: number, height: number, ratio: AspectRatio) {
@@ -125,7 +130,7 @@ export async function renderPhoto(source: string, settings: EditSettings, option
   context.translate(canvas.width / 2, canvas.height / 2);
   context.rotate(rotation * Math.PI / 180);
   context.scale(settings.flipHorizontal ? -1 : 1, settings.flipVertical ? -1 : 1);
-  context.filter = buildCssFilter(settings, getPreset(settings.presetId), false);
+  context.filter = buildCssFilter(settings, getPreset(settings.presetId), false, false);
   context.imageSmoothingEnabled = true;
   context.imageSmoothingQuality = 'high';
   const { crop, scale } = dimensions;

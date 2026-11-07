@@ -47,4 +47,33 @@ describe('filter generation', () => {
     expect(filter).toContain('brightness(1.500)');
     expect(filter).toContain('contrast(1.200)');
   });
+
+  it('creates a clearly visible monochrome preset', () => {
+    const filter = buildCssFilter({ ...DEFAULT_SETTINGS, presetId: 'noir', intensity: 85 });
+    expect(filter).toContain('grayscale(0.850)');
+    expect(filter).not.toContain('contrast(1.000)');
+  });
+
+  it('renders clarity and soft focus in the live filter', () => {
+    const filter = buildCssFilter({ ...DEFAULT_SETTINGS, clarity: 50, blur: 15 });
+    expect(filter).toContain('contrast(1.227)');
+    expect(filter).toContain('blur(1.5px)');
+  });
+
+  it('supports projects saved before clarity and blur existed', () => {
+    const legacy = { ...DEFAULT_SETTINGS } as Record<string, unknown>;
+    delete legacy.clarity;
+    delete legacy.blur;
+    const filter = buildCssFilter(legacy as unknown as typeof DEFAULT_SETTINGS);
+    expect(filter).not.toContain('NaN');
+    expect(filter).toContain('blur(0.0px)');
+  });
+
+  it('does not apply selective light twice during export', () => {
+    const settings = { ...DEFAULT_SETTINGS, highlights: 65, shadows: 65 };
+    const preview = buildCssFilter(settings);
+    const exportFilter = buildCssFilter(settings, undefined, false, false);
+    expect(preview).not.toEqual(exportFilter);
+    expect(exportFilter).toContain('brightness(1.000)');
+  });
 });

@@ -59,6 +59,22 @@ export default function App() {
     return () => { void listener.then((handle) => handle.remove()); };
   }, [paywallOpen, infoTopic, session, view]);
 
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    if (!session) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = previousOverflow; };
+  }, [session]);
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    const listener = CapacitorApp.addListener('resume', () => {
+      window.scrollTo(0, 0);
+    });
+    return () => { void listener.then((handle) => handle.remove()); };
+  }, []);
+
   const openPicker = useCallback(() => fileInput.current?.click(), []);
   const openCamera = useCallback(() => cameraInput.current?.click(), []);
 
