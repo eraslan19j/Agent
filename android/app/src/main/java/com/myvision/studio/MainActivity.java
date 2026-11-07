@@ -1,5 +1,8 @@
 package com.myvision.studio;
 
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.content.res.Configuration;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
@@ -15,24 +18,36 @@ import androidx.core.view.WindowInsetsCompat;
 
 import com.getcapacitor.BridgeActivity;
 
-/**
- * Keeps the WebView below notches/system bars on Android, including Huawei/HarmonyOS.
- * Margins are applied natively because safe-area-inset-* is not reliable in every WebView.
- */
+/** Native theme/splash bootstrap and reliable notch/system-bar insets. */
 public class MainActivity extends BridgeActivity {
     private View webView;
 
+    private boolean isLightTheme() {
+        SharedPreferences preferences = getSharedPreferences("myvision_preferences", Context.MODE_PRIVATE);
+        String theme = preferences.getString("theme", "dark");
+        if ("light".equals(theme)) return true;
+        if ("system".equals(theme)) {
+            return (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) != Configuration.UI_MODE_NIGHT_YES;
+        }
+        return false;
+    }
+
+    private int launchTheme() {
+        SharedPreferences preferences = getSharedPreferences("myvision_preferences", Context.MODE_PRIVATE);
+        String theme = preferences.getString("theme", "dark");
+        if ("light".equals(theme)) return R.style.AppTheme_NoActionBarLaunch_Light;
+        if ("amoled".equals(theme)) return R.style.AppTheme_NoActionBarLaunch_Amoled;
+        if ("system".equals(theme) && isLightTheme()) return R.style.AppTheme_NoActionBarLaunch_Light;
+        return R.style.AppTheme_NoActionBarLaunch;
+    }
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        setTheme(launchTheme());
+        registerPlugin(ThemePlugin.class);
         super.onCreate(savedInstanceState);
 
         Window window = getWindow();
-        int background = Color.rgb(10, 10, 10);
-        window.setStatusBarColor(background);
-        window.setNavigationBarColor(background);
-        window.getDecorView().setBackgroundColor(background);
-        WindowCompat.getInsetsController(window, window.getDecorView()).setAppearanceLightStatusBars(false);
-        WindowCompat.getInsetsController(window, window.getDecorView()).setAppearanceLightNavigationBars(false);
         WindowCompat.setDecorFitsSystemWindows(window, false);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             WindowManager.LayoutParams layoutParams = window.getAttributes();
@@ -41,11 +56,8 @@ public class MainActivity extends BridgeActivity {
         }
 
         webView = getBridge().getWebView();
-        webView.setBackgroundColor(background);
         ViewCompat.setOnApplyWindowInsetsListener(webView, (view, windowInsets) -> {
-            Insets safeArea = windowInsets.getInsets(
-                WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout()
-            );
+            Insets safeArea = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
             ViewGroup.LayoutParams currentParams = view.getLayoutParams();
             if (currentParams instanceof ViewGroup.MarginLayoutParams) {
                 ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) currentParams;
@@ -61,12 +73,28 @@ public class MainActivity extends BridgeActivity {
             }
             return WindowInsetsCompat.CONSUMED;
         });
+        applyAppearance();
         ViewCompat.requestApplyInsets(webView);
+    }
+
+    public void applyAppearance() {
+        boolean light = isLightTheme();
+        SharedPreferences preferences = getSharedPreferences("myvision_preferences", Context.MODE_PRIVATE);
+        String theme = preferences.getString("theme", "dark");
+        int background = light ? Color.rgb(243, 243, 239) : ("amoled".equals(theme) ? Color.BLACK : Color.rgb(10, 10, 10));
+        Window window = getWindow();
+        window.setStatusBarColor(background);
+        window.setNavigationBarColor(background);
+        window.getDecorView().setBackgroundColor(background);
+        WindowCompat.getInsetsController(window, window.getDecorView()).setAppearanceLightStatusBars(light);
+        WindowCompat.getInsetsController(window, window.getDecorView()).setAppearanceLightNavigationBars(light);
+        if (webView != null) webView.setBackgroundColor(background);
     }
 
     @Override
     public void onResume() {
         super.onResume();
+        applyAppearance();
         if (webView != null) {
             webView.post(() -> {
                 ViewCompat.requestApplyInsets(webView);

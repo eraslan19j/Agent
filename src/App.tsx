@@ -9,6 +9,7 @@ import { DiscoverScreen } from './components/DiscoverScreen';
 import { ProjectsScreen } from './components/ProjectsScreen';
 import { ProfileScreen } from './components/ProfileScreen';
 import type { InfoTopic } from './components/ProfileScreen';
+import SettingsScreen from './components/SettingsScreen';
 import { PhotoEditor } from './components/PhotoEditor';
 import { Paywall } from './components/Paywall';
 import { InfoModal } from './components/InfoModal';
@@ -16,6 +17,7 @@ import { MyVisionLogo } from './components/MyVisionLogo';
 import { Toast } from './components/Toast';
 import type { ToastMessage } from './components/Toast';
 import { preparePhoto } from './lib/imageEngine';
+import { applyPreferences, getDynamicAccent, loadPreferences, persistPreferences, watchSystemTheme, type AppPreferences } from './lib/preferences';
 import { loadPreviewPro, loadProjects, persistProjects, savePreviewPro } from './lib/storage';
 import { hasNativePro, isNativeBillingAvailable, purchaseNativePlan, restoreNativePurchases } from './lib/billing';
 import type { DiscoverPhoto } from './lib/discoverService';
@@ -30,7 +32,8 @@ export default function App() {
   const [infoTopic, setInfoTopic] = useState<InfoTopic | null>(null);
   const [importing, setImporting] = useState(false);
   const [discoverOverlayOpen, setDiscoverOverlayOpen] = useState(false);
-  const [showSplash, setShowSplash] = useState(true);
+  const [preferences, setPreferences] = useState<AppPreferences>(() => loadPreferences());
+  const [showSplash, setShowSplash] = useState(() => loadPreferences().splashAnimation);
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
@@ -71,18 +74,43 @@ export default function App() {
 
   useEffect(() => {
     const importTask = importTaskRef.current;
-    if (Capacitor.isNativePlatform()) void SplashScreen.hide();
-    const splashTimer = window.setTimeout(() => setShowSplash(false), 1200);
+    const animationEnabled = loadPreferences().splashAnimation;
+    let splashTimer = 0;
+    let cancelled = false;
+    const frame = requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (cancelled) return;
+      if (Capacitor.isNativePlatform()) void SplashScreen.hide().catch(() => undefined);
+      if (animationEnabled) splashTimer = window.setTimeout(() => setShowSplash(false), 360);
+    }));
     if (isNativeBillingAvailable()) {
       void hasNativePro().then(setIsPro).catch(() => undefined);
     }
     return () => {
+      cancelled = true;
+      cancelAnimationFrame(frame);
       window.clearTimeout(splashTimer);
       importTask.generation += 1;
       importTask.controller?.abort();
       if (toastTimer.current) clearTimeout(toastTimer.current);
     };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    persistPreferences(preferences);
+    const sync = () => {
+      if (!active) return;
+      applyPreferences(preferences);
+      if (preferences.accent === 'dynamic') {
+        void getDynamicAccent().then((color) => { if (active) applyPreferences(preferences, color); });
+      }
+    };
+    sync();
+    const unwatch = watchSystemTheme(sync);
+    return () => { active = false; unwatch(); };
+  }, [preferences]);
+
+  const updatePreferences = (next: AppPreferences) => setPreferences(next);
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
@@ -93,6 +121,7 @@ export default function App() {
       else if (discoverOverlayOpen) discoverCloseHandler.current?.();
       else if (importing) cancelImport();
       else if (session) setSession(null);
+      else if (view === 'settings') setView('profile');
       else if (view !== 'home') setView('home');
       else void CapacitorApp.exitApp();
     });
@@ -239,18 +268,19 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      {showSplash && <div className="app-splash" role="status" aria-label="My Vision yükleniyor">
+      {showSplash && <button type="button" className="app-splash" onClick={() => setShowSplash(false)} aria-label="Açılışı geç">
         <div className="splash-aura" aria-hidden="true" />
-        <div className="splash-brand"><MyVisionLogo variant="wordmark" size={54} /></div>
+        <div className="splash-brand"><MyVisionLogo variant="symbol" size={78} /><span className="splash-word">My Vision<span>.</span></span></div>
         <span className="splash-caption">GÖRÜŞÜNÜ YARAT</span>
         <span className="splash-progress" aria-hidden="true"><i /></span>
-      </div>}
-      {!session && <Navigation view={view} onNavigate={setView} onCreate={openPicker} />}
-      {!session && <main className="app-content">
+      </button>}
+      {!session && view !== 'settings' && <Navigation view={view} onNavigate={setView} onCreate={openPicker} />}
+      {!session && <main className={`app-content ${view === 'settings' ? 'app-content--settings' : ''}`}>
         {view === 'home' && <HomeScreen projects={projects} isPro={isPro} onOpen={openProject} onCreate={openPicker} onCamera={openCamera} onAuto={openAutoEnhance} onPro={() => setPaywallOpen(true)} onProjects={() => setView('projects')} onDiscover={() => setView('discover')} />}
         {view === 'discover' && <DiscoverScreen isPro={isPro} onUsePhoto={importDiscoverPhoto} onCancelImport={cancelImport} onOverlayChange={setDiscoverOverlayOpen} registerCloseHandler={registerDiscoverClose} busy={importing} onPro={() => setPaywallOpen(true)} onNotifications={() => showToast('Karıştır düğmesi her dokunuşta yeni ve gerçek bir seçki getirir.', 'info')} />}
         {view === 'projects' && <ProjectsScreen projects={projects} isPro={isPro} onOpen={openProject} onCreate={openPicker} onDelete={deleteProject} onPro={() => setPaywallOpen(true)} onNotifications={() => showToast('Projelerin cihazında güvende.', 'info')} />}
-        {view === 'profile' && <ProfileScreen projects={projects} isPro={isPro} onPro={() => setPaywallOpen(true)} onInfo={setInfoTopic} onNotifications={() => showToast('Bildirim tercihlerini profil ayarlarından yönetebilirsin.', 'info')} onRestore={() => { void restore().catch(() => undefined); }} />}
+        {view === 'profile' && <ProfileScreen projects={projects} isPro={isPro} onPro={() => setPaywallOpen(true)} onInfo={setInfoTopic} onNotifications={() => showToast('Bildirim tercihlerini profil ayarlarından yönetebilirsin.', 'info')} onRestore={() => { void restore().catch(() => undefined); }} onSettings={() => setView('settings')} />}
+        {view === 'settings' && <SettingsScreen preferences={preferences} onChange={updatePreferences} onBack={() => setView('profile')} />}
       </main>}
       {session && <PhotoEditor session={session} isPro={isPro} onClose={() => setSession(null)} onSave={saveProject} onRequirePro={() => setPaywallOpen(true)} onToast={showToast} />}
 

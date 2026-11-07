@@ -9,6 +9,16 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <title>My Vision — Görüşünü yarat.</title>
+    <script>
+      try {
+        var p = JSON.parse(localStorage.getItem('myvision.preferences.v2') || '{}');
+        var t = p.theme === 'system' ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : (p.theme || 'dark');
+        var colors = { yellow: ['#FFC400', '255, 196, 0'], blue: ['#56A8FF', '86, 168, 255'], green: ['#58D68D', '88, 214, 141'], red: ['#FF6B6B', '255, 107, 107'], purple: ['#B89CFF', '184, 156, 255'], dynamic: ['#FFC400', '255, 196, 0'] };
+        var a = colors[p.accent] || colors.yellow, r = document.documentElement;
+        r.dataset.theme = t; r.dataset.accent = p.accent || 'yellow'; r.dataset.uiStyle = p.interfaceStyle || 'glass'; r.dataset.reduceBlur = String(p.reduceBlur === true); r.lang = p.language || 'tr';
+        r.style.setProperty('--brand-yellow', a[0]); r.style.setProperty('--brand-rgb', a[1]); r.style.setProperty('--lime', a[0]); r.style.colorScheme = t === 'light' ? 'light' : 'dark';
+      } catch (_) { document.documentElement.dataset.theme = 'dark'; }
+    </script>
   </head>
   <body>
     <div id="root"></div>

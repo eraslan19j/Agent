@@ -1,4 +1,4 @@
-import { ArrowRight, Bell, ChevronRight, CircleHelp, CloudOff, Crown, FileText, Folder, Heart, Image, Languages, RotateCcw, ShieldCheck, Sparkles, Star } from 'lucide-react';
+import { ArrowRight, Bell, ChevronRight, CircleHelp, CloudOff, Crown, FileText, Folder, Heart, Image, Languages, RotateCcw, Settings2, ShieldCheck, Sparkles, Star } from 'lucide-react';
 import type { PhotoProject } from '../types';
 import { ScreenHeader } from './ScreenHeader';
 
@@ -11,9 +11,10 @@ interface ProfileScreenProps {
   onInfo: (topic: InfoTopic) => void;
   onNotifications: () => void;
   onRestore: () => void;
+  onSettings: () => void;
 }
 
-export function ProfileScreen({ projects, isPro, onPro, onInfo, onNotifications, onRestore }: ProfileScreenProps) {
+export function ProfileScreen({ projects, isPro, onPro, onInfo, onNotifications, onRestore, onSettings }: ProfileScreenProps) {
   const edits = projects.reduce((count, project) => count + (project.settings.presetId === 'original' ? 0 : 1), 0);
   return (
     <div className="screen profile-screen page-enter">
@@ -32,6 +33,7 @@ export function ProfileScreen({ projects, isPro, onPro, onInfo, onNotifications,
       <section className="settings-section">
         <span className="eyebrow">STÜDYO AYARLARI</span>
         <div className="settings-card">
+          <button onClick={onSettings}><span className="settings-icon"><Settings2 size={19} /></span><span><strong>Görünüm ve uygulama</strong><small>Tema, vurgu, arayüz ve performans</small></span><ChevronRight size={17} /></button>
           <button onClick={() => onInfo('language')}><span className="settings-icon"><Languages size={19} /></span><span><strong>Dil</strong><small>Uygulama dili</small></span><b>Türkçe</b><ChevronRight size={17} /></button>
           <button onClick={() => onInfo('notifications')}><span className="settings-icon"><Bell size={19} /></span><span><strong>Bildirimler</strong><small>Yeni görünümler ve ipuçları</small></span><b>Uygulama içi</b><ChevronRight size={17} /></button>
           <button onClick={() => onInfo('privacy')}><span className="settings-icon"><ShieldCheck size={19} /></span><span><strong>Gizlilik ve veriler</strong><small>Fotoğraflarının kontrolü sende</small></span><ChevronRight size={17} /></button>

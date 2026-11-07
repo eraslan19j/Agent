@@ -47,3 +47,14 @@
 - Uygulama içi logo bileşeni artık üretilen raster ikonu ve erişilebilir metin lockup’ını kullanıyor.
 - Native splash varyantları ve mağaza kapağı yeni ikonla yenilendi; 48 px okunabilirlik ve mobil taşma kontrol edildi.
 - Production build, 22 test ve ESLint başarılı.
+
+## Aşama 3 — Merkezi tema, ayarlar ve tema uyumlu splash
+
+- AMOLED (`#000`), Koyu, Açık ve Sistem temaları; Sarı/Mavi/Yeşil/Kırmızı/Mor ve Android 12+ dinamik vurgu eklendi.
+- Liquid Glass/Sade, ayrı blur azaltma ve açılış animasyonu tercihleri eklendi; tercihler anında uygulanıp `myvision.preferences.v2` altında kalıcı oldu.
+- Tema ve vurgu, ilk boyamadan önce `index.html` içinde uygulanıyor; sistem teması değişimi canlı izleniyor.
+- Profil üzerinden erişilen yeni Ayarlar ekranı ve geri davranışı eklendi.
+- Native `Theme` plugin’i tema/animasyon tercihlerini SharedPreferences’a yazıyor, dinamik sistem rengini ve sistem çubuğu görünümünü güncelliyor.
+- Android 12+ `windowSplashScreen*`, Android 11 ve altı drawable varyantları; AMOLED/Açık launch temaları eklendi. Uygulama içi geçiş hazır olduktan sonra kapanıyor, dokunmayla geçilebiliyor ve yalnız transform/opacity kullanıyor.
+- Kontrollü Chromium: AMOLED `#000`, Açık `#F3F3EF`, sistem dark/light canlı geçişi, mavi vurgu ve reload kalıcılığı, Sade/blur, splash kapalıyken mount olmama ve 390 px taşma kontrolü geçti.
+- Production build, ESLint, Capacitor sync ve 26 test başarılı. Native derleme ve fiziksel soğuk/sıcak açılış ölçümü bu aşamada yapılmadı.
