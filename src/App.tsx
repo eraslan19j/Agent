@@ -29,11 +29,14 @@ export default function App() {
   const [paywallOpen, setPaywallOpen] = useState(false);
   const [infoTopic, setInfoTopic] = useState<InfoTopic | null>(null);
   const [importing, setImporting] = useState(false);
+  const [discoverOverlayOpen, setDiscoverOverlayOpen] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const importTaskRef = useRef<{ generation: number; controller: AbortController | null }>({ generation: 0, controller: null });
+  const discoverCloseHandler = useRef<(() => void) | null>(null);
 
   const showToast = useCallback((text: string, type: 'success' | 'info' = 'success') => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
@@ -41,7 +44,33 @@ export default function App() {
     toastTimer.current = setTimeout(() => setToast(null), 3600);
   }, []);
 
+  const cancelImport = useCallback(() => {
+    importTaskRef.current.generation += 1;
+    importTaskRef.current.controller?.abort();
+    importTaskRef.current.controller = null;
+    setImporting(false);
+  }, []);
+
+  const beginImport = () => {
+    importTaskRef.current.generation += 1;
+    const task = { id: importTaskRef.current.generation, controller: new AbortController() };
+    importTaskRef.current.controller = task.controller;
+    setImporting(true);
+    return task;
+  };
+
+  const finishImport = (task: { id: number; controller: AbortController }) => {
+    if (importTaskRef.current.generation !== task.id) return;
+    importTaskRef.current.controller = null;
+    setImporting(false);
+  };
+
+  const registerDiscoverClose = useCallback((handler: (() => void) | null) => {
+    discoverCloseHandler.current = handler;
+  }, []);
+
   useEffect(() => {
+    const importTask = importTaskRef.current;
     if (Capacitor.isNativePlatform()) void SplashScreen.hide();
     const splashTimer = window.setTimeout(() => setShowSplash(false), 1200);
     if (isNativeBillingAvailable()) {
@@ -49,6 +78,8 @@ export default function App() {
     }
     return () => {
       window.clearTimeout(splashTimer);
+      importTask.generation += 1;
+      importTask.controller?.abort();
       if (toastTimer.current) clearTimeout(toastTimer.current);
     };
   }, []);
@@ -56,22 +87,25 @@ export default function App() {
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
     const listener = CapacitorApp.addListener('backButton', () => {
-      if (paywallOpen) setPaywallOpen(false);
+      if (showSplash) setShowSplash(false);
+      else if (paywallOpen) setPaywallOpen(false);
       else if (infoTopic) setInfoTopic(null);
+      else if (discoverOverlayOpen) discoverCloseHandler.current?.();
+      else if (importing) cancelImport();
       else if (session) setSession(null);
       else if (view !== 'home') setView('home');
       else void CapacitorApp.exitApp();
     });
     return () => { void listener.then((handle) => handle.remove()); };
-  }, [paywallOpen, infoTopic, session, view]);
+  }, [showSplash, paywallOpen, infoTopic, discoverOverlayOpen, importing, session, view, cancelImport]);
 
   useEffect(() => {
     window.scrollTo(0, 0);
-    if (!session) return;
+    if (!session && !discoverOverlayOpen && !importing) return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = previousOverflow; };
-  }, [session]);
+  }, [session, discoverOverlayOpen, importing]);
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
@@ -86,13 +120,16 @@ export default function App() {
 
   const importFile = async (file: File | undefined) => {
     if (!file) return;
-    setImporting(true);
+    const task = beginImport();
     try {
       const source = await preparePhoto(file);
+      if (task.controller.signal.aborted || importTaskRef.current.generation !== task.id) return;
       setSession({ source, name: file.name.replace(/\.[^.]+$/, '') || 'Yeni vizyon' });
     } catch (reason) {
-      showToast(reason instanceof Error ? reason.message : 'Fotoğraf içe aktarılamadı.', 'info');
-    } finally { setImporting(false); }
+      if (!task.controller.signal.aborted && importTaskRef.current.generation === task.id) {
+        showToast(reason instanceof Error ? reason.message : 'Fotoğraf içe aktarılamadı.', 'info');
+      }
+    } finally { finishImport(task); }
   };
 
   const openAutoEnhance = () => {
@@ -106,10 +143,16 @@ export default function App() {
     const auto = input.dataset.auto === 'true';
     input.dataset.auto = 'false';
     input.value = '';
-    setImporting(true);
-    void preparePhoto(file!).then((source) => {
-      setSession({ source, name: file!.name.replace(/\.[^.]+$/, '') || 'Yeni vizyon', applyAutoEnhance: auto });
-    }).catch((reason) => showToast(reason instanceof Error ? reason.message : 'Fotoğraf içe aktarılamadı.', 'info')).finally(() => setImporting(false));
+    if (!file) return;
+    const task = beginImport();
+    void preparePhoto(file).then((source) => {
+      if (task.controller.signal.aborted || importTaskRef.current.generation !== task.id) return;
+      setSession({ source, name: file.name.replace(/\.[^.]+$/, '') || 'Yeni vizyon', applyAutoEnhance: auto });
+    }).catch((reason) => {
+      if (!task.controller.signal.aborted && importTaskRef.current.generation === task.id) {
+        showToast(reason instanceof Error ? reason.message : 'Fotoğraf içe aktarılamadı.', 'info');
+      }
+    }).finally(() => finishImport(task));
   };
 
   const saveProject = async (draft: PhotoProject) => {
@@ -144,24 +187,27 @@ export default function App() {
     });
   };
 
-  const importDiscoverPhoto = async (photo: DiscoverPhoto): Promise<boolean> => {
-    setImporting(true);
-    const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 20000);
+  const importDiscoverPhoto = async (photo: DiscoverPhoto): Promise<void> => {
+    const task = beginImport();
+    let timedOut = false;
+    const timeout = window.setTimeout(() => { timedOut = true; task.controller.abort(); }, 20000);
     try {
-      const response = await fetch(photo.fullUrl, { signal: controller.signal });
-      if (!response.ok) throw new Error('Fotoğraf indirilemedi.');
+      const response = await fetch(photo.fullUrl, { signal: task.controller.signal });
+      if (!response.ok) throw new Error('Fotoğraf servisi yanıt vermedi. Bağlantını kontrol et.');
       const blob = await response.blob();
-      if (!blob.type.startsWith('image/')) throw new Error('Geçerli bir görsel alınamadı.');
+      if (!blob.type.startsWith('image/')) throw new Error('Servis geçerli bir görsel döndürmedi.');
       const safeName = photo.author.replace(/[^a-zA-Z0-9ğüşöçıİĞÜŞÖÇ]+/g, '-').slice(0, 40);
       const file = new File([blob], `Lorem-Picsum-${safeName}-${photo.id}.jpg`, { type: blob.type || 'image/jpeg' });
       const source = await preparePhoto(file);
+      if (task.controller.signal.aborted || importTaskRef.current.generation !== task.id) throw new DOMException('İçe aktarma iptal edildi.', 'AbortError');
       setSession({ source, name: `${photo.author} · Keşif` });
-      return true;
-    } catch {
-      showToast('Fotoğraf stüdyoya aktarılamadı. Bağlantını kontrol edip yeniden dene.', 'info');
-      return false;
-    } finally { window.clearTimeout(timeout); setImporting(false); }
+    } catch (reason) {
+      if (timedOut) throw new Error('Fotoğraf 20 saniyede indirilemedi. Bağlantını kontrol edip tekrar dene.', { cause: reason });
+      if (task.controller.signal.aborted || (reason instanceof DOMException && reason.name === 'AbortError')) {
+        throw new DOMException('İçe aktarma iptal edildi.', 'AbortError');
+      }
+      throw new Error(reason instanceof Error ? reason.message : 'Fotoğraf stüdyoya aktarılamadı. Tekrar dene.', { cause: reason });
+    } finally { window.clearTimeout(timeout); finishImport(task); }
   };
 
   const purchase = async (interval: PlanInterval) => {
@@ -202,7 +248,7 @@ export default function App() {
       {!session && <Navigation view={view} onNavigate={setView} onCreate={openPicker} />}
       {!session && <main className="app-content">
         {view === 'home' && <HomeScreen projects={projects} isPro={isPro} onOpen={openProject} onCreate={openPicker} onCamera={openCamera} onAuto={openAutoEnhance} onPro={() => setPaywallOpen(true)} onProjects={() => setView('projects')} onDiscover={() => setView('discover')} />}
-        {view === 'discover' && <DiscoverScreen isPro={isPro} onUsePhoto={importDiscoverPhoto} busy={importing} onPro={() => setPaywallOpen(true)} onNotifications={() => showToast('Karıştır düğmesi her dokunuşta yeni ve gerçek bir seçki getirir.', 'info')} />}
+        {view === 'discover' && <DiscoverScreen isPro={isPro} onUsePhoto={importDiscoverPhoto} onCancelImport={cancelImport} onOverlayChange={setDiscoverOverlayOpen} registerCloseHandler={registerDiscoverClose} busy={importing} onPro={() => setPaywallOpen(true)} onNotifications={() => showToast('Karıştır düğmesi her dokunuşta yeni ve gerçek bir seçki getirir.', 'info')} />}
         {view === 'projects' && <ProjectsScreen projects={projects} isPro={isPro} onOpen={openProject} onCreate={openPicker} onDelete={deleteProject} onPro={() => setPaywallOpen(true)} onNotifications={() => showToast('Projelerin cihazında güvende.', 'info')} />}
         {view === 'profile' && <ProfileScreen projects={projects} isPro={isPro} onPro={() => setPaywallOpen(true)} onInfo={setInfoTopic} onNotifications={() => showToast('Bildirim tercihlerini profil ayarlarından yönetebilirsin.', 'info')} onRestore={() => { void restore().catch(() => undefined); }} />}
       </main>}
@@ -213,7 +259,7 @@ export default function App() {
 
       {paywallOpen && <Paywall onClose={() => setPaywallOpen(false)} onPurchase={purchase} onRestore={restore} />}
       {infoTopic && <InfoModal topic={infoTopic} onClose={() => setInfoTopic(null)} />}
-      {importing && <div className="importing-overlay glass-modal"><MyVisionLogo size={58} /><span><LoaderCircle className="spin" size={25} /></span><strong>Fotoğrafın hazırlanıyor</strong><small>Vizyonun birazdan başlıyor…</small></div>}
+      {importing && <div className="importing-overlay glass-modal" role="dialog" aria-modal="true" aria-label="Fotoğraf hazırlanıyor"><MyVisionLogo size={58} /><span><LoaderCircle className="spin" size={25} /></span><strong>Fotoğrafın hazırlanıyor</strong><small>Vizyonun birazdan başlıyor…</small><button className="button button--outline import-cancel" onClick={cancelImport}>İptal</button></div>}
       <Toast toast={toast} onClose={() => setToast(null)} />
     </div>
   );

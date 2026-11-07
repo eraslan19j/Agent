@@ -72,7 +72,11 @@ export function PhotoEditor({ session, isPro, onClose, onSave, onRequirePro, onT
   const isQuarterTurn = settings.rotation % 180 !== 0;
 
   useEffect(() => {
-    void loadImage(session.source).then((image) => setImageSize({ width: image.naturalWidth, height: image.naturalHeight })).catch(() => onToast('Fotoğraf yüklenemedi.', 'info'));
+    let active = true;
+    void loadImage(session.source).then((image) => {
+      if (active) setImageSize({ width: image.naturalWidth, height: image.naturalHeight });
+    }).catch(() => { if (active) onToast('Fotoğraf yüklenemedi.', 'info'); });
+    return () => { active = false; };
   }, [session.source, onToast]);
 
   useEffect(() => {
@@ -88,7 +92,16 @@ export function PhotoEditor({ session, isPro, onClose, onSave, onRequirePro, onT
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
     observer?.observe(container);
     window.addEventListener('resize', measure);
-    return () => { observer?.disconnect(); window.removeEventListener('resize', measure); };
+    window.addEventListener('orientationchange', measure);
+    window.visualViewport?.addEventListener('resize', measure);
+    window.visualViewport?.addEventListener('scroll', measure);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', measure);
+      window.removeEventListener('orientationchange', measure);
+      window.visualViewport?.removeEventListener('resize', measure);
+      window.visualViewport?.removeEventListener('scroll', measure);
+    };
   }, []);
 
   const commit = (patch: Partial<EditSettings>, base?: EditSettings) => {

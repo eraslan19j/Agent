@@ -184,26 +184,128 @@ export async function createThumbnail(source: string, settings: EditSettings): P
   });
 }
 
+export function readJpegOrientation(buffer: ArrayBuffer): number {
+  const view = new DataView(buffer);
+  if (view.byteLength < 4 || view.getUint16(0) !== 0xFFD8) return 1;
+  let offset = 2;
+  while (offset + 4 <= view.byteLength) {
+    if (view.getUint8(offset) !== 0xFF) break;
+    const marker = view.getUint8(offset + 1);
+    if (marker === 0xDA || marker === 0xD9) break;
+    const segmentLength = view.getUint16(offset + 2);
+    if (segmentLength < 2 || offset + 2 + segmentLength > view.byteLength) break;
+    if (marker === 0xE1 && segmentLength >= 16 && view.getUint32(offset + 4) === 0x45786966) {
+      const tiff = offset + 10;
+      const littleEndian = view.getUint16(tiff) === 0x4949;
+      if (!littleEndian && view.getUint16(tiff) !== 0x4D4D) return 1;
+      if (view.getUint16(tiff + 2, littleEndian) !== 42) return 1;
+      const ifd = tiff + view.getUint32(tiff + 4, littleEndian);
+      if (ifd + 2 > view.byteLength) return 1;
+      const entries = view.getUint16(ifd, littleEndian);
+      for (let index = 0; index < entries; index += 1) {
+        const entry = ifd + 2 + index * 12;
+        if (entry + 12 > view.byteLength) return 1;
+        if (view.getUint16(entry, littleEndian) === 0x0112) {
+          const orientation = view.getUint16(entry + 8, littleEndian);
+          return orientation >= 1 && orientation <= 8 ? orientation : 1;
+        }
+      }
+      return 1;
+    }
+    offset += 2 + segmentLength;
+  }
+  return 1;
+}
+
+export function readJpegDimensions(buffer: ArrayBuffer): { width: number; height: number } | null {
+  const view = new DataView(buffer);
+  if (view.byteLength < 4 || view.getUint16(0) !== 0xFFD8) return null;
+  let offset = 2;
+  while (offset + 8 <= view.byteLength) {
+    if (view.getUint8(offset) !== 0xFF) return null;
+    const marker = view.getUint8(offset + 1);
+    if (marker === 0xDA || marker === 0xD9) return null;
+    const length = view.getUint16(offset + 2);
+    if (length < 2 || offset + 2 + length > view.byteLength) return null;
+    const isStartOfFrame = [0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF].includes(marker);
+    if (isStartOfFrame) return { height: view.getUint16(offset + 5), width: view.getUint16(offset + 7) };
+    offset += 2 + length;
+  }
+  return null;
+}
+
+export function orientationDimensions(width: number, height: number, orientation: number) {
+  return orientation >= 5 && orientation <= 8 ? { width: height, height: width } : { width, height };
+}
+
+function applyExifTransform(context: CanvasRenderingContext2D, orientation: number, width: number, height: number) {
+  switch (orientation) {
+    case 2: context.transform(-1, 0, 0, 1, width, 0); break;
+    case 3: context.transform(-1, 0, 0, -1, width, height); break;
+    case 4: context.transform(1, 0, 0, -1, 0, height); break;
+    case 5: context.transform(0, 1, 1, 0, 0, 0); break;
+    case 6: context.transform(0, 1, -1, 0, height, 0); break;
+    case 7: context.transform(0, -1, -1, 0, height, width); break;
+    case 8: context.transform(0, -1, 1, 0, 0, width); break;
+    default: break;
+  }
+}
+
 export async function preparePhoto(file: File): Promise<string> {
   if (!file.type.startsWith('image/')) throw new Error('Lütfen JPG, PNG veya WebP formatında bir fotoğraf seçin.');
   if (file.size > 30 * 1024 * 1024) throw new Error('Fotoğraf 30 MB sınırını aşıyor.');
+  const isJpeg = file.type === 'image/jpeg' || file.type === 'image/jpg';
+  const jpegBuffer = isJpeg ? await file.arrayBuffer() : null;
+  const orientation = jpegBuffer ? readJpegOrientation(jpegBuffer) : 1;
   const dataUrl = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result as string);
     reader.onerror = () => reject(new Error('Dosya okunamadı.'));
+    reader.onabort = () => reject(new DOMException('Dosya okuma iptal edildi.', 'AbortError'));
     reader.readAsDataURL(file);
   });
-  const image = await loadImage(dataUrl);
-  const maxDimension = 2800;
-  if (Math.max(image.naturalWidth, image.naturalHeight) <= maxDimension) return dataUrl;
-  const scale = maxDimension / Math.max(image.naturalWidth, image.naturalHeight);
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.round(image.naturalWidth * scale);
-  canvas.height = Math.round(image.naturalHeight * scale);
-  const context = canvas.getContext('2d');
-  if (!context) return dataUrl;
-  context.drawImage(image, 0, 0, canvas.width, canvas.height);
-  return canvas.toDataURL('image/jpeg', 0.9);
+
+  let bitmap: ImageBitmap | null = null;
+  let fallbackImage: HTMLImageElement | null = null;
+  try {
+    if (typeof createImageBitmap === 'function') {
+      try { bitmap = await createImageBitmap(file, { imageOrientation: 'none' }); } catch { bitmap = null; }
+    }
+    if (!bitmap) fallbackImage = await loadImage(dataUrl);
+    const source = bitmap ?? fallbackImage!;
+    const rawWidth = bitmap ? bitmap.width : fallbackImage!.naturalWidth;
+    const rawHeight = bitmap ? bitmap.height : fallbackImage!.naturalHeight;
+    // Some Chromium/WebView versions ignore imageOrientation:'none' and return an
+    // already-oriented bitmap. Compare SOF dimensions to avoid rotating it twice.
+    let effectiveOrientation = bitmap ? orientation : 1;
+    if (bitmap && jpegBuffer && orientation !== 1) {
+      const encoded = readJpegDimensions(jpegBuffer);
+      const decoderAppliedExif = encoded
+        ? orientation >= 5 && orientation <= 8
+          ? rawWidth === encoded.height && rawHeight === encoded.width
+          : true
+        : true;
+      if (decoderAppliedExif) effectiveOrientation = 1;
+    }
+    const oriented = orientationDimensions(rawWidth, rawHeight, effectiveOrientation);
+    const maxDimension = 2800;
+    if (orientation === 1 && effectiveOrientation === 1 && Math.max(oriented.width, oriented.height) <= maxDimension) return dataUrl;
+
+    const scale = Math.min(1, maxDimension / Math.max(oriented.width, oriented.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(oriented.width * scale));
+    canvas.height = Math.max(1, Math.round(oriented.height * scale));
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Fotoğraf bellekte hazırlanamadı. Daha küçük bir fotoğraf deneyin.');
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = 'high';
+    context.scale(scale, scale);
+    applyExifTransform(context, effectiveOrientation, rawWidth, rawHeight);
+    context.drawImage(source, 0, 0);
+    return canvas.toDataURL(file.type === 'image/png' ? 'image/png' : 'image/jpeg', 0.9);
+  } finally {
+    bitmap?.close();
+  }
 }
 
 export const freshSettings = (): EditSettings => ({ ...DEFAULT_SETTINGS });
