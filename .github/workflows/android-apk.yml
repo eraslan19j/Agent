@@ -69,7 +69,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          ./gradlew assembleDebug --no-daemon --stacktrace > ../android-build.log 2>&1
+          ./gradlew assembleDebug --no-daemon > ../android-build.log 2>&1
           STATUS=$?
           cat ../android-build.log
           if [ "$STATUS" -ne 0 ]; then
