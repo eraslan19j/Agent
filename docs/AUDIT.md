@@ -33,6 +33,14 @@ Bu tur yalnız temizlik, sade sistem tasarımı, doğrulamalı yerel depolama, s
 - MP4 imza ve stream kontrolleri geçti; çıktı browser’da **64 × 64, yaklaşık 1,014 saniye** oynatıldı.
 - Tarayıcı konsolunda hata görülmedi.
 
+## Android paketi
+
+- GitHub Actions derlemesi **42472709540** başarıyla tamamlandı.
+- Web testleri, FFmpeg smoke, Capacitor sync, `assembleDebug`, target SDK ve 16 KB zipalign adımları geçti.
+- Release asset’i `My-Vision-1.4.0-debug.apk`, **13.720.070 byte** olarak API’de doğrulandı.
+- CI SHA-256: `59befc51430490ffebe896c14d0f1fddaf008753dfbf16d94ac6bcf7d03c2b67`.
+- Release asset’inin yönlendirildiği `release-assets.githubusercontent.com` sandbox’ın izinli hostları dışında olduğundan APK buraya yeniden indirilemedi; yerel ikinci checksum ve ZIP açma testi yapılmadı.
+
 ## Henüz doğrulanmayanlar
 
 - Fiziksel Poco/HyperOS cihaz davranışı ve gerçek Android kamera/galeri izinleri
