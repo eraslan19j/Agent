@@ -23,9 +23,6 @@
     "@capacitor/share": "^8.0.0",
     "@capacitor/splash-screen": "^8.0.0",
     "@capacitor/status-bar": "^8.0.0",
-    "@fontsource/instrument-serif": "^5.2.8",
-    "@fontsource/manrope": "^5.2.8",
-    "@revenuecat/purchases-capacitor": "^14.1.0",
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

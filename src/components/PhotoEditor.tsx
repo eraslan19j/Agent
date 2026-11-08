@@ -2,8 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft, Check, CircleGauge, Columns2, Contrast, Crop, Download, Eye, Focus,
   FlipHorizontal2, FlipVertical2, Grid3X3, Image as ImageIcon, LoaderCircle,
-  LockKeyhole, Redo2, RotateCcw, RotateCw, Save, Share2, SlidersHorizontal,
-  Sparkles, Sun, Thermometer, Undo2, WandSparkles, Waves, Palette, Eraser, Shapes,
+  Redo2, RotateCcw, RotateCw, Save, Share2, SlidersHorizontal,
+  Sparkles, Sun, Thermometer, Undo2, WandSparkles, Waves, Palette, Type,
   ZoomIn, ZoomOut, Copy, Clipboard, Plus, Trash2, BarChart3,
 } from 'lucide-react';
 import { AUTO_ENHANCE_SETTINGS, getPreset, PRESETS } from '../data/presets';
@@ -15,20 +15,18 @@ import { Brand } from './Brand';
 import { MyVisionLogo } from './MyVisionLogo';
 import { Modal } from './Modal';
 import { EditorSlider } from './EditorSlider';
-import { AdvancedEditorPanel, CreativeEditorPanel, RetouchEditorPanel, type InteractionTool } from './AdvancedEditorPanels';
+import { AdvancedEditorPanel, TextEditorPanel, type InteractionTool } from './AdvancedEditorPanels';
 import { FreeCropEditor } from './FreeCropEditor';
 import { PhotoHistogram } from './PhotoHistogram';
 
 interface PhotoEditorProps {
   session: EditorSession;
-  isPro: boolean;
   onClose: () => void;
   onSave: (project: PhotoProject) => Promise<PhotoProject>;
-  onRequirePro: () => void;
   onToast: (message: string, type?: 'success' | 'info') => void;
 }
 
-const ratios: { value: AspectRatio; label: string; pro?: boolean }[] = [
+const ratios: { value: AspectRatio; label: string }[] = [
   { value: 'original', label: 'Orijinal' },
   { value: 'free', label: 'Serbest' },
   { value: '1:1', label: 'Post 1:1' },
@@ -36,7 +34,7 @@ const ratios: { value: AspectRatio; label: string; pro?: boolean }[] = [
   { value: '9:16', label: 'Story 9:16' },
   { value: '3:4', label: '3:4' },
   { value: '2:3', label: 'Kapak 2:3' },
-  { value: '16:9', label: '16:9', pro: true },
+  { value: '16:9', label: '16:9' },
 ];
 
 const adjustments = [
@@ -49,17 +47,15 @@ const adjustments = [
   { key: 'temperature' as const, label: 'Sıcaklık', min: -100, max: 100, icon: Thermometer },
 ];
 
-const strokeSizeForPreview = (size: number, width: number, height: number) => Math.max(1, size / 1000 * Math.min(width, height));
-
 const effects = [
   { key: 'clarity' as const, label: 'Netlik', min: -50, max: 100, icon: Focus },
-  { key: 'blur' as const, label: 'Yumuşak odak', min: 0, max: 20, icon: Waves, pro: true },
+  { key: 'blur' as const, label: 'Yumuşak odak', min: 0, max: 20, icon: Waves },
   { key: 'fade' as const, label: 'Solma', min: 0, max: 100, icon: ImageIcon },
   { key: 'vignette' as const, label: 'Vinyet', min: 0, max: 100, icon: CircleGauge },
-  { key: 'grain' as const, label: 'Film greni', min: 0, max: 100, icon: Grid3X3, pro: true },
+  { key: 'grain' as const, label: 'Film greni', min: 0, max: 100, icon: Grid3X3 },
 ];
 
-export function PhotoEditor({ session, isPro, onClose, onSave, onRequirePro, onToast }: PhotoEditorProps) {
+export function PhotoEditor({ session, onClose, onSave, onToast }: PhotoEditorProps) {
   const [settings, setSettings] = useState<EditSettings>(() => freshSettings({ ...session.initialSettings, ...(session.applyAutoEnhance ? AUTO_ENHANCE_SETTINGS : {}) }));
   const [history, setHistory] = useState<EditSettings[]>([]);
   const [future, setFuture] = useState<EditSettings[]>([]);
@@ -77,10 +73,8 @@ export function PhotoEditor({ session, isPro, onClose, onSave, onRequirePro, onT
   const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
   const [stageBounds, setStageBounds] = useState({ width: 0, height: 0 });
   const [adjustGroup, setAdjustGroup] = useState<'light' | 'effects'>('light');
-  const [interactionTool, setInteractionTool] = useState<InteractionTool>('none');
-  const [retouchRadius, setRetouchRadius] = useState(30);
-  const [brushSize, setBrushSize] = useState(22);
-  const [brushColor, setBrushColor] = useState('#FFC400');
+  const [interactionTool] = useState<InteractionTool>('none');
+  const [selectedTextId, setSelectedTextId] = useState<string | null>(null);
   const [freeCropOpen, setFreeCropOpen] = useState(false);
   const [advancedPreview, setAdvancedPreview] = useState<string | null>(null);
   const [previewBusy, setPreviewBusy] = useState(false);
@@ -88,8 +82,7 @@ export function PhotoEditor({ session, isPro, onClose, onSave, onRequirePro, onT
   const [recipes, setRecipes] = useState<CustomRecipe[]>(() => loadRecipes());
   const [recipeName, setRecipeName] = useState('');
   const sliderStart = useRef<EditSettings | null>(null);
-  const drawingStroke = useRef<string | null>(null);
-  const layerGesture = useRef<{ kind: 'text' | 'sticker' | 'mask'; id: string; rect: DOMRect } | null>(null);
+  const layerGesture = useRef<{ kind: 'text' | 'mask'; id: string; rect: DOMRect } | null>(null);
   const touchPoints = useRef(new Map<number, { x: number; y: number }>());
   const pinchStart = useRef<{ distance: number; zoom: number } | null>(null);
   const stageContainerRef = useRef<HTMLDivElement>(null);
@@ -137,7 +130,7 @@ export function PhotoEditor({ session, isPro, onClose, onSave, onRequirePro, onT
     const timer = window.setTimeout(() => {
       setPreviewBusy(true);
       const maxDimension = Math.min(1100, Math.max(480, Math.ceil(Math.max(stageBounds.width, stageBounds.height) * Math.min(2, window.devicePixelRatio || 1))));
-      void renderPhoto(session.source, settings, { format: settings.backgroundRemoval ? 'png' : 'jpeg', quality: .82, maxDimension }).then(async blob => {
+      void renderPhoto(session.source, settings, { format: 'jpeg', quality: .82, maxDimension }).then(async blob => {
         if (!active) return;
         setAdvancedPreview(URL.createObjectURL(blob));
       }).catch(() => {
@@ -200,7 +193,6 @@ export function PhotoEditor({ session, isPro, onClose, onSave, onRequirePro, onT
 
   const selectPreset = (presetId: string) => {
     const preset = getPreset(presetId);
-    if (preset.pro && !isPro) { onRequirePro(); return; }
     commit({ presetId, intensity: presetId === 'original' ? 0 : 85 });
     onToast(presetId === 'original' ? 'Temel görünüme dönüldü.' : `${preset.name} fotoğrafına uygulandı.`);
   };
@@ -226,13 +218,11 @@ export function PhotoEditor({ session, isPro, onClose, onSave, onRequirePro, onT
   };
 
   const exportPhoto = async () => {
-    if (exportOptions.maxDimension > 2048 && !isPro) { onRequirePro(); return; }
     setBusy('export');
     try {
-      const effectiveOptions = { ...exportOptions, format: settings.backgroundRemoval ? 'png' as const : exportOptions.format };
-      const blob = await renderPhoto(session.source, settings, effectiveOptions);
+      const blob = await renderPhoto(session.source, settings, exportOptions);
       const safeName = (name.trim() || 'my-vision').toLocaleLowerCase('tr').replace(/[^a-z0-9ğüşöçıİĞÜŞÖÇ]+/gi, '-').replace(/İ/g, 'i');
-      await downloadBlob(blob, `${safeName}.${effectiveOptions.format === 'jpeg' ? 'jpg' : 'png'}`);
+      await downloadBlob(blob, `${safeName}.${exportOptions.format === 'jpeg' ? 'jpg' : 'png'}`);
       setExportOpen(false);
       onToast('Fotoğrafın hazır. Harika görünüyor!');
     } catch (reason) {
@@ -243,7 +233,7 @@ export function PhotoEditor({ session, isPro, onClose, onSave, onRequirePro, onT
   const share = async () => {
     setBusy('share');
     try {
-      const blob = await renderPhoto(session.source, settings, { format: 'jpeg', quality: 0.9, maxDimension: isPro ? 4096 : 2048 });
+      const blob = await renderPhoto(session.source, settings, { format: 'jpeg', quality: 0.9, maxDimension: 4096 });
       await shareProject(blob);
     } catch (reason) {
       if (reason instanceof Error && reason.name !== 'AbortError') onToast('Paylaşım başlatılamadı.', 'info');
@@ -255,44 +245,13 @@ export function PhotoEditor({ session, isPro, onClose, onSave, onRequirePro, onT
     y: Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height)),
   });
 
-  const stagePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (interactionTool === 'none' || interactionTool === 'radial' || interactionTool === 'linear') return;
-    const rect = event.currentTarget.getBoundingClientRect();
-    const point = normalizedPoint(event, rect);
-    if (interactionTool === 'brush') {
-      event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); startHistory();
-      const id = crypto.randomUUID(); drawingStroke.current = id;
-      const stroke = { id, color: brushColor, size: brushSize, opacity: .85, points: [point] };
-      setSettings(current => ({ ...current, brushStrokes: [...current.brushStrokes.slice(-19), stroke] }));
-      return;
-    }
-    const type = interactionTool;
-    if (type === 'heal' || type === 'object' || type === 'redeye') {
-      event.preventDefault();
-      commit({ repairs: [...settings.repairs.slice(-39), { id: crypto.randomUUID(), type, ...point, radius: retouchRadius / Math.min(rect.width, rect.height) }] });
-    }
-  };
-
-  const stagePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    const id = drawingStroke.current;
-    if (!id || interactionTool !== 'brush') return;
-    const point = normalizedPoint(event, event.currentTarget.getBoundingClientRect());
-    setSettings(current => ({ ...current, brushStrokes: current.brushStrokes.map(stroke => {
-      if (stroke.id !== id) return stroke;
-      const last = stroke.points.at(-1);
-      if (last && Math.hypot(last.x - point.x, last.y - point.y) < .003) return stroke;
-      return { ...stroke, points: [...stroke.points.slice(-239), point] };
-    }) }));
-  };
-
-  const stagePointerUp = () => { if (drawingStroke.current) { drawingStroke.current = null; endSlider(); } };
-
-  const startLayerDrag = (event: React.PointerEvent, kind: 'text' | 'sticker' | 'mask', id: string) => {
+  const startLayerDrag = (event: React.PointerEvent, kind: 'text' | 'mask', id: string) => {
     event.preventDefault(); event.stopPropagation();
     const stage = event.currentTarget.closest('.photo-stage');
     if (!stage) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     layerGesture.current = { kind, id, rect: stage.getBoundingClientRect() };
+    if (kind === 'text') setSelectedTextId(id);
     startHistory();
   };
   const moveLayer = (event: React.PointerEvent) => {
@@ -301,7 +260,6 @@ export function PhotoEditor({ session, isPro, onClose, onSave, onRequirePro, onT
     event.stopPropagation();
     const point = normalizedPoint(event, gesture.rect);
     if (gesture.kind === 'text') liveSettings(current => ({ ...current, texts: current.texts.map(item => item.id === gesture.id ? { ...item, ...point } : item) }));
-    else if (gesture.kind === 'sticker') liveSettings(current => ({ ...current, stickers: current.stickers.map(item => item.id === gesture.id ? { ...item, ...point } : item) }));
     else liveSettings(current => ({ ...current, masks: current.masks.map(item => item.id === gesture.id ? { ...item, ...point } : item) }));
   };
   const endLayerDrag = () => { if (layerGesture.current) { layerGesture.current = null; endSlider(); } };
@@ -347,7 +305,7 @@ export function PhotoEditor({ session, isPro, onClose, onSave, onRequirePro, onT
       <header className="editor-header">
         <div className="editor-header__left"><button className="icon-button" onClick={onClose} aria-label="Editörden çık"><ArrowLeft size={21} /></button><span className="editor-brand"><Brand compact /></span><span className="editor-divider" /><input className="project-name-input" value={name} onChange={(event) => setName(event.target.value)} aria-label="Proje adı" maxLength={48} /></div>
         <div className="editor-header__center"><button className="icon-button" onClick={undo} disabled={!history.length} aria-label="Geri al"><Undo2 size={19} /></button><button className="icon-button" onClick={redo} disabled={!future.length} aria-label="Yinele"><Redo2 size={19} /></button></div>
-        <div className="editor-header__actions"><button className="button button--ghost editor-save" aria-label="Kaydet" onClick={() => void save()} disabled={busy !== null}>{busy === 'save' ? <LoaderCircle className="spin" size={17} /> : <Save size={17} />}<span>Kaydet</span></button><button className="button button--lime button--small" aria-label="Dışa aktar" onClick={() => { if (settings.backgroundRemoval) setExportOptions(options => ({ ...options, format: 'png' })); setExportOpen(true); }}><Download size={17} /><span>Dışa aktar</span></button></div>
+        <div className="editor-header__actions"><button className="button button--ghost editor-save" aria-label="Kaydet" onClick={() => void save()} disabled={busy !== null}>{busy === 'save' ? <LoaderCircle className="spin" size={17} /> : <Save size={17} />}<span>Kaydet</span></button><button className="button button--lime button--small" aria-label="Dışa aktar" onClick={() => setExportOpen(true)}><Download size={17} /><span>Dışa aktar</span></button></div>
       </header>
 
       <main className="editor-workspace">
@@ -357,17 +315,15 @@ export function PhotoEditor({ session, isPro, onClose, onSave, onRequirePro, onT
             <div><button className={compare ? 'tool-button active' : 'tool-button'} onClick={() => { setCompare(!compare); setShowOriginal(false); }}><Columns2 size={16} /> <span>Önce / Sonra</span></button><button className={showHistogram ? 'tool-button active' : 'tool-button'} onClick={() => setShowHistogram(!showHistogram)} aria-label="Histogram"><BarChart3 size={17} /></button><button className={showGrid ? 'tool-button active' : 'tool-button'} onClick={() => setShowGrid(!showGrid)} aria-label="Izgara"><Grid3X3 size={17} /></button><button className="tool-button" onClick={share} disabled={busy !== null} aria-label="Paylaş">{busy === 'share' ? <LoaderCircle className="spin" size={17} /> : <Share2 size={17} />}</button></div>
           </div>
           <div className="canvas-stage" ref={stageContainerRef} onPointerDown={pinchDown} onPointerMove={pinchMove} onPointerUp={pinchUp} onPointerCancel={pinchUp}>
-            <div className={`photo-stage ${interactionTool !== 'none' ? 'photo-stage--interactive' : ''}`} style={{ width: preview.width || '100%', height: preview.height || '100%', aspectRatio: preview.aspectRatio, transform: `scale(${zoom})` }} onPointerDown={stagePointerDown} onPointerMove={stagePointerMove} onPointerUp={stagePointerUp} onPointerCancel={stagePointerUp}>
+            <div className={`photo-stage ${interactionTool !== 'none' ? 'photo-stage--interactive' : ''}`} style={{ width: preview.width || '100%', height: preview.height || '100%', aspectRatio: preview.aspectRatio, transform: `scale(${zoom})` }}>
               <div className="photo-stage__image">
                 <img src={advanced && advancedPreview ? advancedPreview : session.source} alt="Düzenlenen fotoğraf" style={advanced && advancedPreview ? advancedImageStyle : { ...previewImageStyle, filter }} draggable={false} />
               </div>
               {(compare || showOriginal) && <div className="before-image" style={{ clipPath: showOriginal ? 'inset(0)' : `inset(0 ${100 - comparePosition}% 0 0)` }}><img src={session.source} alt="Düzenleme öncesi" style={previewImageStyle} draggable={false} /></div>}
               {!advanced && settings.vignette > 0 && !showOriginal && <div className="vignette-overlay" style={{ opacity: Math.min(1, settings.vignette / 100) }} />}
               {!advanced && settings.grain > 0 && !showOriginal && <div className="grain-overlay" style={{ opacity: Math.min(0.65, settings.grain / 140) }} />}
-              {advanced && previewBusy && <svg className="brush-live" viewBox="0 0 1 1" preserveAspectRatio="none">{settings.brushStrokes.map(stroke => <polyline key={stroke.id} points={stroke.points.map(point => `${point.x},${point.y}`).join(' ')} fill="none" stroke={stroke.color} strokeOpacity={stroke.opacity} strokeWidth={stroke.size / 1000} vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" style={{ strokeWidth: `${strokeSizeForPreview(stroke.size, preview.width, preview.height)}px` }} />)}</svg>}
               {settings.masks.map(mask => <div key={mask.id} className={`mask-marker mask-marker--${mask.type}`} style={{ left: `${mask.x * 100}%`, top: `${mask.y * 100}%`, width: `${mask.radius * 200}%`, aspectRatio: mask.type === 'radial' ? 1 : '1 / 5', transform: `translate(-50%,-50%) rotate(${mask.angle}deg)` }} onPointerDown={event => startLayerDrag(event, 'mask', mask.id)} onPointerMove={moveLayer} onPointerUp={endLayerDrag} onPointerCancel={endLayerDrag} />)}
-              {settings.texts.map(layer => <div key={layer.id} className="design-layer design-text" style={{ left: `${layer.x * 100}%`, top: `${layer.y * 100}%`, color: layer.color, fontFamily: layer.font === 'serif' ? '"Instrument Serif",serif' : layer.font === 'mono' ? 'monospace' : 'Manrope,sans-serif', fontSize: `${Math.max(10, layer.size / 550 * Math.min(preview.width, preview.height))}px`, transform: `translate(-50%,-50%) rotate(${layer.rotation}deg)`, textAlign: layer.align }} onPointerDown={event => startLayerDrag(event, 'text', layer.id)} onPointerMove={moveLayer} onPointerUp={endLayerDrag} onPointerCancel={endLayerDrag}><span style={{ opacity: previewBusy || !advancedPreview ? 1 : 0 }}>{layer.text}</span></div>)}
-              {settings.stickers.map(layer => <div key={layer.id} className="design-layer design-sticker" style={{ left: `${layer.x * 100}%`, top: `${layer.y * 100}%`, fontSize: `${Math.max(12, layer.size / 550 * Math.min(preview.width, preview.height))}px`, transform: `translate(-50%,-50%) rotate(${layer.rotation}deg)` }} onPointerDown={event => startLayerDrag(event, 'sticker', layer.id)} onPointerMove={moveLayer} onPointerUp={endLayerDrag} onPointerCancel={endLayerDrag}><span style={{ opacity: previewBusy || !advancedPreview ? 1 : 0 }}>{layer.value}</span></div>)}
+              {settings.texts.map(layer => <div key={layer.id} className="design-layer design-text" style={{ left: `${layer.x * 100}%`, top: `${layer.y * 100}%`, color: layer.color, fontFamily: layer.font === 'serif' ? 'ui-serif, Georgia, serif' : layer.font === 'mono' ? 'ui-monospace, monospace' : 'inherit', fontSize: `${Math.max(10, layer.size / 550 * Math.min(preview.width, preview.height))}px`, transform: `translate(-50%,-50%) rotate(${layer.rotation}deg)`, textAlign: layer.align }} onPointerDown={event => startLayerDrag(event, 'text', layer.id)} onPointerMove={moveLayer} onPointerUp={endLayerDrag} onPointerCancel={endLayerDrag}><span style={{ opacity: previewBusy || !advancedPreview ? 1 : 0 }}>{layer.text}</span></div>)}
               {!compare && <button className={`original-hold ${showOriginal ? 'active' : ''}`} onPointerDown={(event) => { event.preventDefault(); setShowOriginal(true); }} onPointerUp={() => setShowOriginal(false)} onPointerLeave={() => setShowOriginal(false)} onContextMenu={(event) => event.preventDefault()} aria-label="Orijinal fotoğrafı görmek için basılı tut"><Eye size={14} /><span>{showOriginal ? 'ORİJİNAL' : 'Basılı tut: Orijinal'}</span></button>}
               {showGrid && <div className="composition-grid"><i /><i /><i /><i /></div>}
               {compare && <><span className="compare-label compare-label--before">ÖNCE</span><span className="compare-label compare-label--after">SONRA</span><div className="compare-line" style={{ left: `${comparePosition}%` }}><span><Columns2 size={16} /></span></div><input className="compare-range" type="range" min="0" max="100" value={comparePosition} onChange={(event) => setComparePosition(Number(event.target.value))} aria-label="Önce ve sonra karşılaştırması" /></>}
@@ -385,15 +341,14 @@ export function PhotoEditor({ session, isPro, onClose, onSave, onRequirePro, onT
             <button role="tab" aria-selected={activeTab === 'adjust'} className={activeTab === 'adjust' ? 'active' : ''} onClick={() => setActiveTab('adjust')}><SlidersHorizontal size={18} /><span>Ayarlar</span></button>
             <button role="tab" aria-selected={activeTab === 'crop'} className={activeTab === 'crop' ? 'active' : ''} onClick={() => setActiveTab('crop')}><Crop size={18} /><span>Kırp</span></button>
             <button role="tab" aria-selected={activeTab === 'color'} className={activeTab === 'color' ? 'active' : ''} onClick={() => setActiveTab('color')}><Palette size={18} /><span>Renk</span></button>
-            <button role="tab" aria-selected={activeTab === 'retouch'} className={activeTab === 'retouch' ? 'active' : ''} onClick={() => setActiveTab('retouch')}><Eraser size={18} /><span>Rötuş</span></button>
-            <button role="tab" aria-selected={activeTab === 'create'} className={activeTab === 'create' ? 'active' : ''} onClick={() => setActiveTab('create')}><Shapes size={18} /><span>Tasarla</span></button>
+            <button role="tab" aria-selected={activeTab === 'text'} className={activeTab === 'text' ? 'active' : ''} onClick={() => setActiveTab('text')}><Type size={18} /><span>Metin</span></button>
           </div>
           <div className="editor-panel__content">
             {activeTab === 'looks' && <div className="looks-panel">
               <div className="panel-heading"><div><span className="eyebrow">İMZA KOLEKSİYONU</span><h3>Görünümünü seç</h3></div><span>{PRESETS.length} stil</span></div>
               <div className="editor-presets">
                 {PRESETS.map((preset) => <button key={preset.id} className={settings.presetId === preset.id ? 'editor-preset active' : 'editor-preset'} onClick={(event) => { selectPreset(preset.id); event.currentTarget.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' }); }}>
-                  <div><img src={session.source} alt={`${preset.name} önizlemesi`} style={{ filter: buildCssFilter({ ...freshSettings(), presetId: preset.id, intensity: 85 }) }} />{preset.pro && !isPro && <span className="preset-lock"><LockKeyhole size={12} /></span>}{settings.presetId === preset.id && <span className="preset-check"><Check size={13} /></span>}</div><span>{preset.name}</span>
+                  <div><img src={session.source} alt={`${preset.name} önizlemesi`} style={{ filter: buildCssFilter({ ...freshSettings(), presetId: preset.id, intensity: 85 }) }} />{settings.presetId === preset.id && <span className="preset-check"><Check size={13} /></span>}</div><span>{preset.name}</span>
                 </button>)}
               </div>
               {settings.presetId !== 'original' && <div className="intensity-control"><EditorSlider label="Görünüm yoğunluğu" value={settings.intensity} min={0} max={100} onChange={(value) => updateSlider('intensity', value)} onStart={() => { sliderStart.current = settings; }} onEnd={endSlider} onReset={() => commit({ intensity: 100 })} /></div>}
@@ -406,12 +361,12 @@ export function PhotoEditor({ session, isPro, onClose, onSave, onRequirePro, onT
               <div className="panel-heading"><div><span className="eyebrow">HASSAS KONTROL</span><h3>Her ton, senin kararın.</h3></div></div>
               <div className="segmented-control adjust-segments"><button className={adjustGroup === 'light' ? 'active' : ''} onClick={() => setAdjustGroup('light')}>Işık & renk</button><button className={adjustGroup === 'effects' ? 'active' : ''} onClick={() => setAdjustGroup('effects')}>Doku & efekt</button></div>
               <div className="sliders-list">
-                {(adjustGroup === 'light' ? adjustments : effects).map((item) => <div key={item.key} className="adjustment-item">{'pro' in item && item.pro && !isPro && <button className="pro-control-lock" onClick={onRequirePro}><LockKeyhole size={12} /> PRO</button>}<EditorSlider label={item.label} icon={item.icon} value={settings[item.key]} min={item.min} max={item.max} neutral={'neutral' in item ? item.neutral : 0} disabled={'pro' in item && item.pro && !isPro} onChange={(value) => updateSlider(item.key, value)} onStart={() => { sliderStart.current = settings; }} onEnd={endSlider} onReset={() => commit({ [item.key]: 'neutral' in item ? item.neutral : 0 })} /></div>)}
+                {(adjustGroup === 'light' ? adjustments : effects).map((item) => <div key={item.key} className="adjustment-item"><EditorSlider label={item.label} icon={item.icon} value={settings[item.key]} min={item.min} max={item.max} neutral={'neutral' in item ? item.neutral : 0} onChange={(value) => updateSlider(item.key, value)} onStart={() => { sliderStart.current = settings; }} onEnd={endSlider} onReset={() => commit({ [item.key]: 'neutral' in item ? item.neutral : 0 })} /></div>)}
               </div>
             </div>}
             {activeTab === 'crop' && <div className="crop-panel">
               <div className="panel-heading"><div><span className="eyebrow">KADRAJ & AÇI</span><h3>Hikâyeye odaklan.</h3></div></div>
-              <h4 className="control-label">En boy oranı</h4><div className="ratio-grid">{ratios.map((ratio) => <button key={ratio.value} className={settings.aspectRatio === ratio.value ? 'active' : ''} onClick={() => { if (ratio.pro && !isPro) { onRequirePro(); return; } commit({ aspectRatio: ratio.value, ...(ratio.value === 'free' && !settings.crop ? { crop: { x: .08, y: .08, width: .84, height: .84 } } : {}) }); if (ratio.value === 'free') setFreeCropOpen(true); }}><span className={`ratio-icon ratio-icon--${ratio.value.replace(':', '-')}`} /><strong>{ratio.label}</strong>{ratio.pro && !isPro && <LockKeyhole size={11} />}</button>)}</div>
+              <h4 className="control-label">En boy oranı</h4><div className="ratio-grid">{ratios.map((ratio) => <button key={ratio.value} className={settings.aspectRatio === ratio.value ? 'active' : ''} onClick={() => { commit({ aspectRatio: ratio.value, ...(ratio.value === 'free' && !settings.crop ? { crop: { x: .08, y: .08, width: .84, height: .84 } } : {}) }); if (ratio.value === 'free') setFreeCropOpen(true); }}><span className={`ratio-icon ratio-icon--${ratio.value.replace(':', '-')}`} /><strong>{ratio.label}</strong></button>)}</div>
               {settings.aspectRatio === 'free' && <button className="free-crop-open" onClick={() => setFreeCropOpen(true)}><Crop size={15} /> Serbest kadrajı düzenle</button>}
               <div className="geometry-controls"><EditorSlider label="Straighten" value={settings.straighten} min={-45} max={45} displayValue={`${settings.straighten}°`} onChange={value => live({ straighten: value })} onStart={startHistory} onEnd={endSlider} onReset={() => commit({ straighten: 0 })} /><EditorSlider label="Yatay perspektif" value={settings.perspectiveX} min={-35} max={35} onChange={value => live({ perspectiveX: value })} onStart={startHistory} onEnd={endSlider} onReset={() => commit({ perspectiveX: 0 })} /><EditorSlider label="Dikey perspektif" value={settings.perspectiveY} min={-35} max={35} onChange={value => live({ perspectiveY: value })} onStart={startHistory} onEnd={endSlider} onReset={() => commit({ perspectiveY: 0 })} /></div>
               <h4 className="control-label">Döndür</h4><div className="transform-row"><button onClick={() => commit({ rotation: settings.rotation - 90 })}><RotateCcw size={21} /><span>90° sola</span></button><button onClick={() => commit({ rotation: settings.rotation + 90 })}><RotateCw size={21} /><span>90° sağa</span></button></div>
@@ -419,8 +374,7 @@ export function PhotoEditor({ session, isPro, onClose, onSave, onRequirePro, onT
               <div className="editor-tip"><Crop size={17} /><p><strong>Sosyal medyaya hazır</strong>4:5 Instagram gönderileri, 1:1 profil ve ürün kareleri için idealdir.</p></div>
             </div>}
             {activeTab === 'color' && <AdvancedEditorPanel settings={settings} commit={commit} live={live} liveSettings={liveSettings} start={startHistory} end={endSlider} />}
-            {activeTab === 'retouch' && <RetouchEditorPanel settings={settings} commit={commit} live={live} liveSettings={liveSettings} start={startHistory} end={endSlider} tool={interactionTool} setTool={setInteractionTool} radius={retouchRadius} setRadius={setRetouchRadius} />}
-            {activeTab === 'create' && <CreativeEditorPanel settings={settings} commit={commit} live={live} liveSettings={liveSettings} start={startHistory} end={endSlider} tool={interactionTool} setTool={setInteractionTool} brushSize={brushSize} setBrushSize={setBrushSize} brushColor={brushColor} setBrushColor={setBrushColor} />}
+            {activeTab === 'text' && <TextEditorPanel settings={settings} commit={commit} live={live} liveSettings={liveSettings} start={startHistory} end={endSlider} selectedId={selectedTextId} setSelectedId={setSelectedTextId} />}
           </div>
         </aside>
       </main>
@@ -430,7 +384,7 @@ export function PhotoEditor({ session, isPro, onClose, onSave, onRequirePro, onT
       {exportOpen && <Modal title="Fotoğrafını dışa aktar" onClose={() => busy === null && setExportOpen(false)} className="export-modal">
         <div className="export-preview"><img src={session.source} alt="Dışa aktarılacak fotoğraf" style={{ filter }} /><span><Check size={15} /> Düzenlemeler uygulandı</span></div>
         <div className="export-field"><label>Dosya formatı</label><div className="format-options"><button className={exportOptions.format === 'jpeg' ? 'active' : ''} onClick={() => setExportOptions({ ...exportOptions, format: 'jpeg' })}><strong>JPG</strong><small>Paylaşım için ideal</small></button><button className={exportOptions.format === 'png' ? 'active' : ''} onClick={() => setExportOptions({ ...exportOptions, format: 'png' })}><strong>PNG</strong><small>Kayıpsız kalite</small></button></div></div>
-        <div className="export-field"><label>Çıktı boyutu</label><div className="size-options">{[1080, 2048, 4096].map((size) => <button key={size} className={exportOptions.maxDimension === size ? 'active' : ''} onClick={() => { if (size > 2048 && !isPro) { onRequirePro(); return; } setExportOptions({ ...exportOptions, maxDimension: size }); }}><strong>{size === 4096 ? '4K' : `${size} px`}</strong><small>{size === 1080 ? 'Sosyal medya' : size === 2048 ? 'Yüksek kalite' : 'Maksimum'}</small>{size > 2048 && !isPro && <LockKeyhole size={12} />}</button>)}</div></div>
+        <div className="export-field"><label>Çıktı boyutu</label><div className="size-options">{[1080, 2048, 4096].map((size) => <button key={size} className={exportOptions.maxDimension === size ? 'active' : ''} onClick={() => setExportOptions({ ...exportOptions, maxDimension: size })}><strong>{size === 4096 ? '4K' : `${size} px`}</strong><small>{size === 1080 ? 'Sosyal medya' : size === 2048 ? 'Yüksek kalite' : 'Maksimum'}</small></button>)}</div></div>
         {exportOptions.format === 'jpeg' && <EditorSlider label="Görüntü kalitesi" value={Math.round(exportOptions.quality * 100)} min={60} max={100} displayValue={`${Math.round(exportOptions.quality * 100)}%`} onChange={(value) => setExportOptions({ ...exportOptions, quality: value / 100 })} />}
         <div className="export-summary"><span>Tahmini çıktı</span><strong>{output ? `${output.width} × ${output.height} px` : 'Hesaplanıyor…'}</strong></div>
         <button className="button button--lime export-confirm" onClick={() => void exportPhoto()} disabled={busy !== null}>{busy === 'export' ? <LoaderCircle className="spin" size={19} /> : <Download size={19} />}{busy === 'export' ? 'Fotoğraf işleniyor…' : 'Fotoğrafı indir'}</button>

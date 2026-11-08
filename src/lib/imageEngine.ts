@@ -293,14 +293,13 @@ export async function preparePhoto(file: File): Promise<string> {
 export const freshSettings = (initial?: Partial<EditSettings>): EditSettings => {
   const base = structuredClone(DEFAULT_SETTINGS);
   if (!initial) return base;
-  const merged: EditSettings = { ...base, ...initial, hsl: { ...base.hsl }, frame: { ...base.frame, ...initial.frame } };
+  // Eski sürümlerdeki kaldırılmış araç alanlarını yeni oturuma taşıma.
+  const allowed = Object.fromEntries(Object.entries(initial).filter(([key]) => key in base)) as Partial<EditSettings>;
+  const merged: EditSettings = { ...base, ...allowed, hsl: { ...base.hsl }, frame: { ...base.frame, ...allowed.frame } };
   for (const key of Object.keys(base.hsl) as (keyof EditSettings['hsl'])[]) {
-    merged.hsl[key] = { ...base.hsl[key], ...initial.hsl?.[key] };
+    merged.hsl[key] = { ...base.hsl[key], ...allowed.hsl?.[key] };
   }
-  merged.masks = initial.masks ?? [];
-  merged.repairs = initial.repairs ?? [];
-  merged.texts = initial.texts ?? [];
-  merged.stickers = initial.stickers ?? [];
-  merged.brushStrokes = initial.brushStrokes ?? [];
+  merged.masks = allowed.masks ?? [];
+  merged.texts = allowed.texts ?? [];
   return merged;
 };

@@ -11,22 +11,22 @@ const tone = (values: Partial<Tone>): Tone => ({
 });
 
 export const PRESETS: PhotoPreset[] = [
-  { id: 'original', name: 'Orijinal', category: 'Portre', pro: false, accent: '#a8a8a8', tone: tone({}) },
-  { id: 'portrait', name: 'Doğal Portre', category: 'Portre', pro: false, accent: '#e6aa83', tone: tone({ brightness: 1.09, contrast: 1.09, saturation: 0.88, sepia: 0.12 }) },
-  { id: 'golden', name: 'Altın Saat', category: 'Portre', pro: true, accent: '#e6a45c', tone: tone({ brightness: 1.05, contrast: 1.08, saturation: 1.12, sepia: 0.18, hueRotate: -5 }) },
-  { id: 'cinema', name: 'Sinematik', category: 'Sinema', pro: false, accent: '#64a6a0', tone: tone({ brightness: 0.88, contrast: 1.32, saturation: 0.65, sepia: 0.06, hueRotate: -16 }) },
-  { id: 'noir', name: 'Noir', category: 'Siyah Beyaz', pro: false, accent: '#b4b4b4', tone: tone({ brightness: 0.96, contrast: 1.28, saturation: 0, grayscale: 1 }) },
-  { id: 'film', name: 'Analog 35', category: 'Sinema', pro: true, accent: '#c4a875', tone: tone({ brightness: 1.04, contrast: 0.92, saturation: 0.78, sepia: 0.15, hueRotate: -4 }) },
-  { id: 'aegean', name: 'Ege Mavisi', category: 'Seyahat', pro: false, accent: '#63b8ce', tone: tone({ brightness: 1.04, contrast: 1.16, saturation: 1.32, hueRotate: 9 }) },
-  { id: 'soft', name: 'Yumuşak Işık', category: 'Portre', pro: true, accent: '#d9b9a7', tone: tone({ brightness: 1.1, contrast: 0.86, saturation: 0.86, sepia: 0.06 }) },
-  { id: 'urban', name: 'Gece Yarısı', category: 'Sinema', pro: true, accent: '#5c75a8', tone: tone({ brightness: 0.88, contrast: 1.24, saturation: 0.7, hueRotate: 9 }) },
-  { id: 'wild', name: 'Doğada', category: 'Seyahat', pro: false, accent: '#8da66a', tone: tone({ brightness: 1.03, contrast: 1.14, saturation: 1.22, hueRotate: -7 }) },
-  { id: 'silver', name: 'Gümüş', category: 'Siyah Beyaz', pro: true, accent: '#a7abb3', tone: tone({ brightness: 1.08, contrast: 1.08, saturation: 0, grayscale: 1 }) },
-  { id: 'postcard', name: 'Kartpostal', category: 'Seyahat', pro: true, accent: '#e4a877', tone: tone({ brightness: 1.05, contrast: 1.12, saturation: 1.2, sepia: 0.04 }) },
-  { id: 'landscape', name: 'Canlı Manzara', category: 'Manzara', pro: false, accent: '#65a879', tone: tone({ brightness: 1.02, contrast: 1.18, saturation: 1.24, hueRotate: -3 }) },
-  { id: 'food', name: 'Sofra', category: 'Yemek', pro: false, accent: '#d98d55', tone: tone({ brightness: 1.08, contrast: 1.1, saturation: 1.18, sepia: 0.08 }) },
-  { id: 'night', name: 'Gece Işıkları', category: 'Gece', pro: true, accent: '#627ac5', tone: tone({ brightness: 1.04, contrast: 1.22, saturation: 0.9, hueRotate: 7 }) },
-  { id: 'vintage', name: 'Vintage 1974', category: 'Vintage', pro: false, accent: '#b68b66', tone: tone({ brightness: 1.03, contrast: 0.88, saturation: 0.72, sepia: 0.24, hueRotate: -5 }) },
+  { id: 'original', name: 'Orijinal', category: 'Portre', accent: '#a8a8a8', tone: tone({}) },
+  { id: 'portrait', name: 'Doğal Portre', category: 'Portre', accent: '#e6aa83', tone: tone({ brightness: 1.09, contrast: 1.09, saturation: 0.88, sepia: 0.12 }) },
+  { id: 'golden', name: 'Altın Saat', category: 'Portre', accent: '#e6a45c', tone: tone({ brightness: 1.05, contrast: 1.08, saturation: 1.12, sepia: 0.18, hueRotate: -5 }) },
+  { id: 'cinema', name: 'Sinematik', category: 'Sinema', accent: '#64a6a0', tone: tone({ brightness: 0.88, contrast: 1.32, saturation: 0.65, sepia: 0.06, hueRotate: -16 }) },
+  { id: 'noir', name: 'Noir', category: 'Siyah Beyaz', accent: '#b4b4b4', tone: tone({ brightness: 0.96, contrast: 1.28, saturation: 0, grayscale: 1 }) },
+  { id: 'film', name: 'Analog 35', category: 'Sinema', accent: '#c4a875', tone: tone({ brightness: 1.04, contrast: 0.92, saturation: 0.78, sepia: 0.15, hueRotate: -4 }) },
+  { id: 'aegean', name: 'Ege Mavisi', category: 'Seyahat', accent: '#63b8ce', tone: tone({ brightness: 1.04, contrast: 1.16, saturation: 1.32, hueRotate: 9 }) },
+  { id: 'soft', name: 'Yumuşak Işık', category: 'Portre', accent: '#d9b9a7', tone: tone({ brightness: 1.1, contrast: 0.86, saturation: 0.86, sepia: 0.06 }) },
+  { id: 'urban', name: 'Gece Yarısı', category: 'Sinema', accent: '#5c75a8', tone: tone({ brightness: 0.88, contrast: 1.24, saturation: 0.7, hueRotate: 9 }) },
+  { id: 'wild', name: 'Doğada', category: 'Seyahat', accent: '#8da66a', tone: tone({ brightness: 1.03, contrast: 1.14, saturation: 1.22, hueRotate: -7 }) },
+  { id: 'silver', name: 'Gümüş', category: 'Siyah Beyaz', accent: '#a7abb3', tone: tone({ brightness: 1.08, contrast: 1.08, saturation: 0, grayscale: 1 }) },
+  { id: 'postcard', name: 'Kartpostal', category: 'Seyahat', accent: '#e4a877', tone: tone({ brightness: 1.05, contrast: 1.12, saturation: 1.2, sepia: 0.04 }) },
+  { id: 'landscape', name: 'Canlı Manzara', category: 'Manzara', accent: '#65a879', tone: tone({ brightness: 1.02, contrast: 1.18, saturation: 1.24, hueRotate: -3 }) },
+  { id: 'food', name: 'Sofra', category: 'Yemek', accent: '#d98d55', tone: tone({ brightness: 1.08, contrast: 1.1, saturation: 1.18, sepia: 0.08 }) },
+  { id: 'night', name: 'Gece Işıkları', category: 'Gece', accent: '#627ac5', tone: tone({ brightness: 1.04, contrast: 1.22, saturation: 0.9, hueRotate: 7 }) },
+  { id: 'vintage', name: 'Vintage 1974', category: 'Vintage', accent: '#b68b66', tone: tone({ brightness: 1.03, contrast: 0.88, saturation: 0.72, sepia: 0.24, hueRotate: -5 }) },
 ];
 
 const neutralHsl = () => ({ hue: 0, saturation: 0, luminance: 0 });
@@ -37,7 +37,7 @@ export const DEFAULT_SETTINGS: EditSettings = {
   flipHorizontal: false, flipVertical: false, aspectRatio: 'original',
   noiseReduction: 0, sharpen: 0, curveShadows: 0, curveMidtones: 0, curveHighlights: 0,
   hsl: { red: neutralHsl(), orange: neutralHsl(), yellow: neutralHsl(), green: neutralHsl(), cyan: neutralHsl(), blue: neutralHsl(), purple: neutralHsl() },
-  masks: [], repairs: [], texts: [], stickers: [], brushStrokes: [], frame: { width: 0, color: '#FFFFFF' }, backgroundRemoval: 0,
+  masks: [], texts: [], frame: { width: 0, color: '#FFFFFF' },
 };
 
 export const AUTO_ENHANCE_SETTINGS: Partial<EditSettings> = {

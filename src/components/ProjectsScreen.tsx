@@ -7,10 +7,10 @@ import { Modal } from './Modal';
 
 type SortMode = 'recent' | 'name' | 'created';
 interface ProjectsScreenProps {
-  projects: PhotoProject[]; isPro: boolean; onOpen: (project: PhotoProject) => void; onCreate: () => void; onDelete: (id: string) => void;
-  onUpdate: (id: string, patch: Partial<PhotoProject>) => void; onPro: () => void; onNotifications: () => void;
+  projects: PhotoProject[]; onOpen: (project: PhotoProject) => void; onCreate: () => void; onDelete: (id: string) => void;
+  onUpdate: (id: string, patch: Partial<PhotoProject>) => void;
 }
-export function ProjectsScreen({ projects, isPro, onOpen, onCreate, onDelete, onUpdate, onPro, onNotifications }: ProjectsScreenProps) {
+export function ProjectsScreen({ projects, onOpen, onCreate, onDelete, onUpdate }: ProjectsScreenProps) {
   const [query, setQuery] = useState(''); const [sort, setSort] = useState<SortMode>('recent');
   const [filter, setFilter] = useState<'all' | 'favorites'>('all'); const [album, setAlbum] = useState('all');
   const [editing, setEditing] = useState<PhotoProject | null>(null); const [editAlbum, setEditAlbum] = useState(''); const [editTags, setEditTags] = useState('');
@@ -21,7 +21,7 @@ export function ProjectsScreen({ projects, isPro, onOpen, onCreate, onDelete, on
   }).sort((a, b) => sort === 'name' ? a.name.localeCompare(b.name, 'tr') : sort === 'created' ? b.createdAt - a.createdAt : b.updatedAt - a.updatedAt), [projects, query, sort, filter, album]);
   const edit = (project: PhotoProject) => { setEditing(project); setEditAlbum(project.album ?? ''); setEditTags((project.tags ?? []).join(', ')); };
   return <div className="screen projects-screen page-enter">
-    <ScreenHeader eyebrow="KİŞİSEL ARŞİVİN" title="Projeler" subtitle="Yalnızca senin çalışmaların. Bu cihazda, senin kontrolünde." isPro={isPro} onPro={onPro} onNotifications={onNotifications} />
+    <ScreenHeader eyebrow="KİŞİSEL ARŞİVİN" title="Projeler" subtitle="Yalnızca senin çalışmaların. Bu cihazda, senin kontrolünde." />
     <div className="project-summary glass-panel"><span className="summary-icon"><FolderOpen size={24} /></span><div><strong>{projects.length}</strong><span>kayıtlı çalışma</span></div><button className="button button--lime button--small" onClick={onCreate}><ImagePlus size={17} /> Yeni proje</button></div>
     {projects.length > 0 && <>
       <label className="search-field glass-field"><Search size={19} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="İsim, albüm veya etiket ara" aria-label="Projelerde ara" /></label>

@@ -11,10 +11,6 @@ export function curveValue(value: number, settings: Pick<EditSettings, 'curveSha
   const highlights = settings.curveHighlights / 100 * 0.32 * n ** 2;
   return clamp(Math.round((n + shadows + midtones + highlights) * 255));
 }
-export function backgroundAlpha(distance: number, tolerance: number) {
-  if (!tolerance) return 1;
-  return clamp((distance - tolerance * 0.55) / Math.max(1, tolerance * 0.75), 0, 1);
-}
 function rgbToHsl(red: number, green: number, blue: number) {
   const r = red / 255, g = green / 255, b = blue / 255;
   const max = Math.max(r, g, b), min = Math.min(r, g, b), delta = max - min;
@@ -76,18 +72,10 @@ function maskWeights(settings: EditSettings, nx: number, ny: number) {
   }
   return { exposure, saturation, temperature };
 }
-function borderColor(data: Uint8ClampedArray, width: number, height: number) {
-  const points = [[2, 2], [width - 3, 2], [2, height - 3], [width - 3, height - 3], [Math.floor(width / 2), 2], [Math.floor(width / 2), height - 3]];
-  const color = [0, 0, 0];
-  for (const [x, y] of points) { const index = (y * width + x) * 4; for (let c = 0; c < 3; c += 1) color[c] += data[index + c] / points.length; }
-  return color;
-}
 function applyAdvanced(data: Uint8ClampedArray, width: number, height: number, settings: EditSettings) {
   const hasHsl = Object.values(settings.hsl).some(channel => channel.hue || channel.saturation || channel.luminance);
-  if (!hasHsl && !settings.curveShadows && !settings.curveMidtones && !settings.curveHighlights && !settings.masks.length && !settings.backgroundRemoval && !settings.repairs.some(mark => mark.type === 'redeye')) return;
+  if (!hasHsl && !settings.curveShadows && !settings.curveMidtones && !settings.curveHighlights && !settings.masks.length) return;
   const curves = new Uint8ClampedArray(256); for (let i = 0; i < 256; i += 1) curves[i] = curveValue(i, settings);
-  const background = settings.backgroundRemoval ? borderColor(data, width, height) : null;
-  const tolerance = settings.backgroundRemoval * 1.7;
   for (let y = 0; y < height; y += 1) for (let x = 0; x < width; x += 1) {
     const index = (y * width + x) * 4;
     let r = curves[data[index]], g = curves[data[index + 1]], b = curves[data[index + 2]];
@@ -105,13 +93,7 @@ function applyAdvanced(data: Uint8ClampedArray, width: number, height: number, s
       r = r * light + local.temperature * 0.16; g *= light; b = b * light - local.temperature * 0.16;
       if (local.saturation) { const luma = r * 0.2126 + g * 0.7152 + b * 0.0722; const amount = 1 + local.saturation / 100; r = luma + (r - luma) * amount; g = luma + (g - luma) * amount; b = luma + (b - luma) * amount; }
     }
-    for (const mark of settings.repairs) {
-      if (mark.type !== 'redeye') continue;
-      const distance = Math.hypot((x + .5) / width - mark.x, (y + .5) / height - mark.y);
-      if (distance < mark.radius && r > g * 1.3 && r > b * 1.25) { const neutral = (g + b) / 2; const weight = clamp(1 - distance / mark.radius, 0, 1); r = r * (1 - weight) + neutral * weight; }
-    }
     data[index] = clamp(r); data[index + 1] = clamp(g); data[index + 2] = clamp(b);
-    if (background) { const distance = Math.hypot(r - background[0], g - background[1], b - background[2]); data[index + 3] = Math.round(data[index + 3] * backgroundAlpha(distance, tolerance)); }
   }
 }
 

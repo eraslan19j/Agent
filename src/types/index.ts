@@ -1,13 +1,12 @@
-export type AppView = 'home' | 'discover' | 'projects' | 'profile' | 'settings';
-export type EditorTab = 'looks' | 'adjust' | 'crop' | 'color' | 'retouch' | 'create';
+export type AppView = 'home' | 'projects' | 'profile' | 'settings';
+export type EditorTab = 'looks' | 'adjust' | 'crop' | 'color' | 'text';
 export type AspectRatio = 'original' | 'free' | '1:1' | '4:5' | '3:4' | '16:9' | '9:16' | '2:3';
 export type ExportFormat = 'jpeg' | 'png';
-export type PlanInterval = 'monthly' | 'yearly';
 
 export interface Tone { brightness: number; contrast: number; saturation: number; sepia: number; grayscale: number; hueRotate: number; }
 export interface PhotoPreset {
   id: string; name: string; category: 'Portre' | 'Manzara' | 'Yemek' | 'Gece' | 'Vintage' | 'Sinema' | 'Seyahat' | 'Siyah Beyaz' | 'Özel';
-  pro: boolean; tone: Tone; accent: string;
+  tone: Tone; accent: string;
 }
 export interface NormalizedCrop { x: number; y: number; width: number; height: number; }
 export interface HslChannel { hue: number; saturation: number; luminance: number; }
@@ -16,13 +15,10 @@ export interface SelectiveMask {
   id: string; type: 'radial' | 'linear'; x: number; y: number; radius: number; angle: number; feather: number;
   exposure: number; saturation: number; temperature: number;
 }
-export interface RepairMark { id: string; type: 'heal' | 'object' | 'redeye'; x: number; y: number; radius: number; }
 export interface TextLayer {
   id: string; text: string; x: number; y: number; size: number; color: string; font: 'sans' | 'serif' | 'mono';
   align: 'left' | 'center' | 'right'; rotation: number;
 }
-export interface StickerLayer { id: string; value: string; x: number; y: number; size: number; rotation: number; }
-export interface BrushStroke { id: string; color: string; size: number; opacity: number; points: { x: number; y: number }[]; }
 export interface FrameSettings { width: number; color: string; }
 
 export interface EditSettings {
@@ -32,8 +28,7 @@ export interface EditSettings {
   flipHorizontal: boolean; flipVertical: boolean; aspectRatio: AspectRatio; crop?: NormalizedCrop;
   noiseReduction: number; sharpen: number; curveShadows: number; curveMidtones: number; curveHighlights: number;
   hsl: Record<HslColor, HslChannel>;
-  masks: SelectiveMask[]; repairs: RepairMark[]; texts: TextLayer[]; stickers: StickerLayer[]; brushStrokes: BrushStroke[];
-  frame: FrameSettings; backgroundRemoval: number;
+  masks: SelectiveMask[]; texts: TextLayer[]; frame: FrameSettings;
 }
 
 export interface PhotoProject {

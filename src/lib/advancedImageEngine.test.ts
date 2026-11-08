@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { backgroundAlpha, curveValue, straightenCoverScale } from './advancedImageEngine';
+import { curveValue, straightenCoverScale } from './advancedImageEngine';
 import { computeSettingsCrop, freshSettings } from './imageEngine';
 import { processPixelData } from './pixelProcessing';
 
@@ -24,11 +24,15 @@ describe('advanced image geometry and pixels', () => {
     expect(curveValue(255, lifted)).toBe(255);
   });
 
-  it('feathers background alpha instead of making a hard binary edge', () => {
-    expect(backgroundAlpha(0, 100)).toBe(0);
-    expect(backgroundAlpha(200, 100)).toBe(1);
-    expect(backgroundAlpha(90, 100)).toBeGreaterThan(0);
-    expect(backgroundAlpha(90, 100)).toBeLessThan(1);
+
+  it('drops fields from removed tools when restoring a legacy project', () => {
+    const legacy = { ...freshSettings(), repairs: [{ id: 'old' }], stickers: [{ id: 'old' }], brushStrokes: [{ id: 'old' }], backgroundRemoval: 80 };
+    const restored = freshSettings(legacy) as unknown as Record<string, unknown>;
+    expect(restored).not.toHaveProperty('repairs');
+    expect(restored).not.toHaveProperty('stickers');
+    expect(restored).not.toHaveProperty('brushStrokes');
+    expect(restored).not.toHaveProperty('backgroundRemoval');
+    expect(restored.texts).toEqual([]);
   });
 
   it('uses a real normalized free crop for output geometry', () => {
@@ -55,19 +59,5 @@ describe('advanced image geometry and pixels', () => {
     expect(pixels[4]).toBe(100);
   });
 
-  it('desaturates a red-eye mark', () => {
-    const settings = freshSettings({ repairs: [{ id: 'r', type: 'redeye', x: .5, y: .5, radius: .8 }] });
-    const pixels = new Uint8ClampedArray([220, 15, 12, 255]);
-    processPixelData(pixels, 1, 1, settings);
-    expect(pixels[0]).toBeLessThan(30);
-  });
 
-  it('removes border color while preserving a contrasting subject', () => {
-    const width = 9, height = 9, pixels = new Uint8ClampedArray(width * height * 4);
-    for (let i = 0; i < pixels.length; i += 4) { pixels[i] = 255; pixels[i + 1] = 200; pixels[i + 2] = 0; pixels[i + 3] = 255; }
-    const center = (4 * width + 4) * 4; pixels[center] = 0; pixels[center + 1] = 40; pixels[center + 2] = 180;
-    processPixelData(pixels, width, height, freshSettings({ backgroundRemoval: 60 }));
-    expect(pixels[3]).toBe(0);
-    expect(pixels[center + 3]).toBe(255);
-  });
 });
