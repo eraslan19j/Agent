@@ -60,6 +60,7 @@ jobs:
         run: |
           npm run test
           npm run lint
+          npm run test:ffmpeg
 
       - name: Build and synchronize Android assets
         run: npm run assets && npm run cap:sync
