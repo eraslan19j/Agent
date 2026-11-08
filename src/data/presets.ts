@@ -38,6 +38,7 @@ export const DEFAULT_SETTINGS: EditSettings = {
   noiseReduction: 0, sharpen: 0, curveShadows: 0, curveMidtones: 0, curveHighlights: 0,
   hsl: { red: neutralHsl(), orange: neutralHsl(), yellow: neutralHsl(), green: neutralHsl(), cyan: neutralHsl(), blue: neutralHsl(), purple: neutralHsl() },
   masks: [], texts: [], frame: { width: 0, color: '#FFFFFF' },
+  creative: { id: 'none', intensity: 0, particles: false, particleIntensity: 35, dateStamp: false, dateStampText: '' },
 };
 
 export const AUTO_ENHANCE_SETTINGS: Partial<EditSettings> = {

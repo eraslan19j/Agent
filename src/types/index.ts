@@ -20,6 +20,15 @@ export interface TextLayer {
   align: 'left' | 'center' | 'right'; rotation: number;
 }
 export interface FrameSettings { width: number; color: string; }
+export type CreativeEffectId = 'none' | 'glow' | 'soft-focus' | 'light-leak' | 'flare' | 'vhs' | 'film' | 'scanlines' | 'glitch' | 'rgb-shift' | 'shake' | 'pixelate' | 'monochrome' | 'duotone' | 'sepia' | 'vignette' | 'letterbox';
+export interface CreativeEffectSettings {
+  id: CreativeEffectId;
+  intensity: number;
+  particles: boolean;
+  particleIntensity: number;
+  dateStamp: boolean;
+  dateStampText: string;
+}
 
 export interface EditSettings {
   presetId: string; intensity: number; exposure: number; brightness: number; contrast: number; saturation: number;
@@ -28,7 +37,7 @@ export interface EditSettings {
   flipHorizontal: boolean; flipVertical: boolean; aspectRatio: AspectRatio; crop?: NormalizedCrop;
   noiseReduction: number; sharpen: number; curveShadows: number; curveMidtones: number; curveHighlights: number;
   hsl: Record<HslColor, HslChannel>;
-  masks: SelectiveMask[]; texts: TextLayer[]; frame: FrameSettings;
+  masks: SelectiveMask[]; texts: TextLayer[]; frame: FrameSettings; creative: CreativeEffectSettings;
 }
 
 export interface PhotoProject {

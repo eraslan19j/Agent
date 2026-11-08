@@ -1,6 +1,7 @@
 import type { EditSettings } from '../types';
 import { processCanvasPixels } from './pixelScheduler';
 import { textAvailableRatio, wrapTextLines } from './textLayout';
+import { hasCreativeEffect } from './creativeEffects';
 
 export { curveValue } from './pixelProcessing';
 
@@ -70,7 +71,7 @@ function drawCreativeLayers(context: CanvasRenderingContext2D, width: number, he
 export function hasAdvancedRendering(settings: EditSettings) {
   return Boolean(settings.straighten || settings.perspectiveX || settings.perspectiveY || settings.noiseReduction || settings.sharpen ||
     settings.curveShadows || settings.curveMidtones || settings.curveHighlights || Object.values(settings.hsl).some(value => value.hue || value.saturation || value.luminance) ||
-    settings.masks.length || settings.texts.length || settings.frame.width);
+    settings.masks.length || settings.texts.length || settings.frame.width || hasCreativeEffect(settings));
 }
 
 export async function applyAdvancedRendering(context: CanvasRenderingContext2D, width: number, height: number, settings: EditSettings, signal?: AbortSignal) {

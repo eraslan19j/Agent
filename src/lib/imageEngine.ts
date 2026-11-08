@@ -1,5 +1,6 @@
 import { DEFAULT_SETTINGS, getPreset } from '../data/presets';
 import { applyAdvancedRendering, straightenCoverScale } from './advancedImageEngine';
+import { applyCreativeEffects, normalizeCreativeSettings } from './creativeEffects';
 import type { AspectRatio, EditSettings, ExportOptions, PhotoPreset } from '../types';
 
 export { hasAdvancedRendering } from './advancedImageEngine';
@@ -160,6 +161,7 @@ export async function renderPhoto(source: string, settings: EditSettings, option
   context.restore();
   await applyAdvancedRendering(context, canvas.width, canvas.height, settings, options.signal);
   applyVignette(context, canvas.width, canvas.height, settings.vignette);
+  applyCreativeEffects(context, canvas.width, canvas.height, settings);
 
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => {
@@ -350,7 +352,7 @@ export const freshSettings = (initial?: Partial<EditSettings>): EditSettings => 
   if (!initial) return base;
   // Eski sürümlerdeki kaldırılmış araç alanlarını yeni oturuma taşıma.
   const allowed = Object.fromEntries(Object.entries(initial).filter(([key]) => key in base)) as Partial<EditSettings>;
-  const merged: EditSettings = { ...base, ...allowed, hsl: { ...base.hsl }, frame: { ...base.frame, ...allowed.frame } };
+  const merged: EditSettings = { ...base, ...allowed, hsl: { ...base.hsl }, frame: { ...base.frame, ...allowed.frame }, creative: normalizeCreativeSettings(allowed.creative) };
   for (const key of Object.keys(base.hsl) as (keyof EditSettings['hsl'])[]) {
     merged.hsl[key] = { ...base.hsl[key], ...allowed.hsl?.[key] };
   }

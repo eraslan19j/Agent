@@ -21,6 +21,7 @@ import { EditorSlider } from './EditorSlider';
 import { AdvancedEditorPanel, TextEditorPanel, type InteractionTool } from './AdvancedEditorPanels';
 import { FreeCropEditor } from './FreeCropEditor';
 import { PhotoHistogram } from './PhotoHistogram';
+import { CreativeEffectsPanel } from './CreativeEffectsPanel';
 
 interface PhotoEditorProps {
   session: EditorSession;
@@ -491,6 +492,7 @@ export function PhotoEditor({ session, onClose, onSave, onToast }: PhotoEditorPr
               <div className="sliders-list">
                 {(adjustGroup === 'light' ? adjustments : effects).map((item) => <div key={item.key} className="adjustment-item"><EditorSlider label={item.label} icon={item.icon} value={settings[item.key]} min={item.min} max={item.max} neutral={'neutral' in item ? item.neutral : 0} onChange={(value) => updateSlider(item.key, value)} onStart={() => { sliderStart.current = settings; }} onEnd={endSlider} onReset={() => commit({ [item.key]: 'neutral' in item ? item.neutral : 0 })} /></div>)}
               </div>
+              {adjustGroup === 'effects' && <CreativeEffectsPanel settings={settings} commit={commit} liveSettings={liveSettings} start={startHistory} end={endSlider} />}
             </div>}
             {activeTab === 'crop' && <div className="crop-panel">
               <div className="panel-heading"><div><span className="eyebrow">KADRAJ & AÇI</span><h3>Hikâyeye odaklan.</h3></div></div>
