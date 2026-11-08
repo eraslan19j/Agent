@@ -1,5 +1,6 @@
 import type { EditSettings } from '../types';
 import { processCanvasPixels } from './pixelScheduler';
+import { textAvailableRatio, wrapTextLines } from './textLayout';
 
 export { curveValue } from './pixelProcessing';
 
@@ -44,10 +45,20 @@ function drawCreativeLayers(context: CanvasRenderingContext2D, width: number, he
   for (const text of settings.texts) {
     const family = text.font === 'serif' ? 'ui-serif, Georgia, serif' : text.font === 'mono' ? 'ui-monospace, SFMono-Regular, Consolas, monospace' : '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
     context.save(); context.translate(text.x * width, text.y * height); context.rotate(text.rotation * Math.PI / 180);
-    context.font = `600 ${Math.max(8, text.size / 550 * unit)}px ${family}`;
+    const maxWidth = width * textAvailableRatio(text);
+    let fontSize = Math.max(8, text.size / 550 * unit);
+    context.font = `600 ${fontSize}px ${family}`;
+    const longestWordWidth = Math.max(0, ...text.text.split(/\s+/).map(word => context.measureText(word).width));
+    if (longestWordWidth > maxWidth) {
+      fontSize = Math.max(8, fontSize * maxWidth / longestWordWidth);
+      context.font = `600 ${fontSize}px ${family}`;
+    }
     context.fillStyle = text.color; context.textAlign = text.align; context.textBaseline = 'middle';
     context.shadowColor = 'rgba(0,0,0,.28)'; context.shadowBlur = unit * 0.006;
-    context.fillText(text.text, 0, 0, width * 0.9); context.restore();
+    const lines = wrapTextLines(text.text, maxWidth, value => context.measureText(value).width);
+    const lineHeight = fontSize * 1.1;
+    lines.forEach((line, index) => context.fillText(line, 0, (index - (lines.length - 1) / 2) * lineHeight));
+    context.restore();
   }
   if (settings.frame.width) {
     const thickness = settings.frame.width / 1000 * unit;

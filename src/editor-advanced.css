@@ -11,7 +11,7 @@
 .editor-slider__label { min-height: 32px; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .editor-slider__label > span { display: flex; align-items: center; gap: 7px; color: var(--text); font-size: 13px; }
 .editor-slider__label > span svg { color: var(--muted); }
-.editor-slider__label button { min-width: 44px; min-height: 36px; padding: 0 6px; border-radius: 8px; background: var(--field-bg); color: var(--muted); font-size: 12px; text-align: center; }
+.editor-slider__label button { min-width: 44px; min-height: 44px; padding: 0 6px; border-radius: 8px; background: var(--field-bg); color: var(--muted); font-size: 12px; text-align: center; }
 .editor-slider input[type='range'] { --range-progress: 50%; width: 100%; height: 28px; display: block; margin: 0; appearance: none; background: transparent; }
 .editor-slider input[type='range']::-webkit-slider-runnable-track { height: 4px; border-radius: 4px; background: linear-gradient(to right,var(--accent) 0 var(--range-progress),var(--line) var(--range-progress) 100%); }
 .editor-slider input[type='range']::-webkit-slider-thumb { width: 20px; height: 20px; margin-top: -8px; appearance: none; border: 2px solid var(--surface); border-radius: 50%; background: var(--accent); box-shadow: 0 1px 3px rgba(0,0,0,.2); }
@@ -32,7 +32,7 @@
 .text-composer { display: flex; gap: 8px; }
 .text-composer input, .recipe-save input { flex: 1; min-width: 0; min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; outline: 0; background: var(--field-bg); }
 .text-composer input:focus, .recipe-save input:focus { border-color: var(--accent); }
-.text-composer button, .recipe-save button { width: 44px; height: 44px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 10px; background: var(--accent); color: #FFF; }
+.text-composer button, .recipe-save button { width: 44px; height: 44px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 10px; background: var(--accent-action); color: #FFF; }
 .text-layer-list { margin-top: 16px; border-top: 1px solid var(--line); }
 .layer-row { display: flex; align-items: center; border-bottom: 1px solid var(--line); }
 .layer-row.active { background: var(--accent-soft); }
@@ -51,7 +51,7 @@
 .creative-options { min-height: 48px; display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 13px; }
 .design-layer, .mask-marker { position: absolute; z-index: 9; touch-action: none; user-select: none; cursor: grab; }
 .design-layer:active, .mask-marker:active { cursor: grabbing; }
-.design-text { max-width: 90%; padding: 4px; border: 1px solid transparent; font-weight: 600; line-height: 1.1; white-space: nowrap; text-shadow: 0 2px 8px rgba(0,0,0,.28); }
+.design-text { width: max-content; max-width: 90%; padding: 4px; border: 1px solid transparent; font-weight: 600; line-height: 1.1; white-space: normal; overflow-wrap: anywhere; text-shadow: 0 2px 8px rgba(0,0,0,.28); }
 .design-text.selected { border-color: rgba(255,255,255,.8); border-radius: 4px; }
 .mask-marker { border: 1px dashed #FFF; opacity: .8; }
 .mask-marker--radial { border-radius: 50%; }
