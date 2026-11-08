@@ -90,27 +90,27 @@ jobs:
           if [ "$NATIVE_COUNT" -eq 0 ]; then echo "Java/Kotlin-only package: no custom ELF alignment required."; fi
 
       - name: Rename APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk My-Vision-1.3.0-debug.apk
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk My-Vision-1.4.0-debug.apk
 
       - name: Create checksum
-        run: sha256sum My-Vision-1.3.0-debug.apk > My-Vision-1.3.0-debug.apk.sha256
+        run: sha256sum My-Vision-1.4.0-debug.apk > My-Vision-1.4.0-debug.apk.sha256
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: My-Vision-1.3.0-debug
+          name: My-Vision-1.4.0-debug
           path: |
-            My-Vision-1.3.0-debug.apk
-            My-Vision-1.3.0-debug.apk.sha256
+            My-Vision-1.4.0-debug.apk
+            My-Vision-1.4.0-debug.apk.sha256
           if-no-files-found: error
           retention-days: 30
 
       - name: Publish downloadable APK release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: my-vision-v1.3.0-debug
+          tag_name: my-vision-v1.4.0-debug
           target_commitish: arena/2abc0dfe-agent
-          name: My Vision v1.3.0 — Android APK
+          name: My Vision v1.4.0 — Android APK
           body: |
             My Vision fotoğraf stüdyosunun kurulabilir Android test sürümü.
 
@@ -119,27 +119,27 @@ jobs:
             - Derleme: debug imzalı, kurulabilir APK
             - Üretim: Play Store için imzalı AAB gerekir
 
-            **1.3.0 yenilikleri:** Worker tabanlı gerçek piksel işleme, Curves/HSL/maskeler, cihaz içi rötuş ve arka plan kaldırma, kolaj/batch stüdyoları, özel tarifler, proje arşivi, TR/EN arayüz ve güvenli gerçek RevenueCat paket akışı.
+            **1.4.0 — Aşama 1:** Sade Apple tarzı tasarım, doğrulamalı IndexedDB proje migrasyonu, sonradan düzenlenebilen metin katmanları, ücretsiz görünümler ve 4K fotoğraf çıktısı. Bu sürüm yalnızca fotoğraf düzenleme içerir.
 
-            Android 7.0 ve üzeri cihazlara kurulabilir. Gerekirse kurulum sırasında bu kaynaktan uygulama yüklemeye izin verin. Bu genel test derlemesinde ödeme alınmaz; gerçek Google Play satın alımı için RevenueCat anahtarı ve ürünleri gerekir.
+            Android 7.0 ve üzeri cihazlara kurulabilir. Gerekirse kurulum sırasında bu kaynaktan uygulama yüklemeye izin verin. Bu sürüm hesap, ödeme veya bulut servisi kullanmaz.
 
             Derleme raporu: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           prerelease: true
           draft: false
           overwrite_files: true
           files: |
-            My-Vision-1.3.0-debug.apk
-            My-Vision-1.3.0-debug.apk.sha256
+            My-Vision-1.4.0-debug.apk
+            My-Vision-1.4.0-debug.apk.sha256
 
       - name: Attach verified checksum to release notes
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view my-vision-v1.3.0-debug --json body --jq .body > release-notes.md
+          gh release view my-vision-v1.4.0-debug --json body --jq .body > release-notes.md
           {
             printf '\n## Paket doğrulama\n\n'
             printf -- '- Target: Android 16 / API 36\n- 16 KB APK zipalign: CI doğrulandı\n'
-            printf -- '- APK SHA-256: `%s`\n' "$(cut -d' ' -f1 My-Vision-1.3.0-debug.apk.sha256)"
+            printf -- '- APK SHA-256: `%s`\n' "$(cut -d' ' -f1 My-Vision-1.4.0-debug.apk.sha256)"
             printf -- '- CI: %s/%s/actions/runs/%s\n' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"
           } >> release-notes.md
-          gh release edit my-vision-v1.3.0-debug --notes-file release-notes.md
+          gh release edit my-vision-v1.4.0-debug --notes-file release-notes.md

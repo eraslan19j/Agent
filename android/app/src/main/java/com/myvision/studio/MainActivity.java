@@ -81,7 +81,7 @@ public class MainActivity extends BridgeActivity {
         boolean light = isLightTheme();
         SharedPreferences preferences = getSharedPreferences("myvision_preferences", Context.MODE_PRIVATE);
         String theme = preferences.getString("theme", "dark");
-        int background = light ? Color.rgb(243, 243, 239) : ("amoled".equals(theme) ? Color.BLACK : Color.rgb(10, 10, 10));
+        int background = light ? Color.rgb(245, 245, 247) : ("amoled".equals(theme) ? Color.BLACK : Color.BLACK);
         Window window = getWindow();
         window.setStatusBarColor(background);
         window.setNavigationBarColor(background);

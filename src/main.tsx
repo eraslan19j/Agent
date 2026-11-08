@@ -2,7 +2,6 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { Capacitor } from '@capacitor/core';
 import './styles.css';
-import './liquid-glass.css';
 import './preferences.css';
 import './editor-advanced.css';
 import './studio.css';

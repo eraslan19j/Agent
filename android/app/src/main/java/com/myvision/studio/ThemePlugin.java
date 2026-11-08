@@ -2,10 +2,7 @@ package com.myvision.studio;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.graphics.Color;
-import android.os.Build;
 
-import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
@@ -25,13 +22,4 @@ public class ThemePlugin extends Plugin {
         call.resolve();
     }
 
-    @PluginMethod
-    public void getDynamicColor(PluginCall call) {
-        JSObject result = new JSObject();
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            int color = getContext().getColor(android.R.color.system_accent1_600);
-            result.put("color", String.format("#%06X", 0xFFFFFF & color));
-        }
-        call.resolve(result);
-    }
 }

@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   bundle-release:
-    name: Verify and bundle My Vision 1.3.0
+    name: Verify and bundle My Vision 1.4.0
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
@@ -70,13 +70,13 @@ jobs:
           grep -q 'targetSdkVersion = 36' android/variables.gradle
       - name: Copy signed release bundle
         run: |
-          cp android/app/build/outputs/bundle/release/app-release.aab My-Vision-1.3.0-release.aab
-          sha256sum My-Vision-1.3.0-release.aab > My-Vision-1.3.0-release.aab.sha256
+          cp android/app/build/outputs/bundle/release/app-release.aab My-Vision-1.4.0-release.aab
+          sha256sum My-Vision-1.4.0-release.aab > My-Vision-1.4.0-release.aab.sha256
       - uses: actions/upload-artifact@v4
         with:
-          name: My-Vision-1.3.0-signed-play-aab
+          name: My-Vision-1.4.0-signed-play-aab
           path: |
-            My-Vision-1.3.0-release.aab
-            My-Vision-1.3.0-release.aab.sha256
+            My-Vision-1.4.0-release.aab
+            My-Vision-1.4.0-release.aab.sha256
           if-no-files-found: error
           retention-days: 14

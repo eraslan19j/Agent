@@ -3,21 +3,21 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#0A0A0A" />
-    <meta name="description" content="My Vision — fotoğraflarını profesyonel görünümler, hassas ayarlar ve yüksek çözünürlüklü dışa aktarma ile dönüştür." />
+    <meta name="theme-color" content="#F5F5F7" />
+    <meta name="description" content="My Vision — fotoğraflarını cihazında görünümler, hassas renk ayarları, metin ve kolaj araçlarıyla düzenle." />
     <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
-    <title>My Vision — Görüşünü yarat.</title>
+    <title>My Vision — Fotoğraf stüdyosu</title>
     <script>
       try {
         var p = JSON.parse(localStorage.getItem('myvision.preferences.v2') || '{}');
-        var t = p.theme === 'system' ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : (p.theme || 'dark');
-        var colors = { yellow: ['#FFC400', '255, 196, 0'], blue: ['#56A8FF', '86, 168, 255'], green: ['#58D68D', '88, 214, 141'], red: ['#FF6B6B', '255, 107, 107'], purple: ['#B89CFF', '184, 156, 255'], dynamic: ['#FFC400', '255, 196, 0'] };
-        var a = colors[p.accent] || colors.yellow, r = document.documentElement;
-        r.dataset.theme = t; r.dataset.accent = p.accent || 'yellow'; r.dataset.uiStyle = p.interfaceStyle || 'glass'; r.dataset.reduceBlur = String(p.reduceBlur === true); r.lang = p.language || 'tr';
-        r.style.setProperty('--brand-yellow', a[0]); r.style.setProperty('--brand-rgb', a[1]); r.style.setProperty('--lime', a[0]); r.style.colorScheme = t === 'light' ? 'light' : 'dark';
-      } catch (_) { document.documentElement.dataset.theme = 'dark'; }
+        var systemDark = matchMedia('(prefers-color-scheme: dark)').matches;
+        var t = !p.theme || p.theme === 'system' ? (systemDark ? 'dark' : 'light') : (p.theme === 'light' ? 'light' : 'dark');
+        document.documentElement.dataset.theme = t;
+        document.documentElement.lang = p.language || 'tr';
+        document.documentElement.style.colorScheme = t;
+      } catch (_) { document.documentElement.dataset.theme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; }
     </script>
   </head>
   <body>

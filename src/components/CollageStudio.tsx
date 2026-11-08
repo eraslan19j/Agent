@@ -73,7 +73,7 @@ export function CollageStudio({ onClose, onToast }: { onClose: () => void; onToa
       context.filter = 'none';
       if (caption.trim()) {
         context.fillStyle = background; context.fillRect(0, output.height - captionSpace, output.width, captionSpace);
-        context.fillStyle = '#FFFFFF'; context.font = `700 ${Math.round(output.height * .035)}px Manrope, sans-serif`; context.textAlign = 'center'; context.textBaseline = 'middle';
+        context.fillStyle = '#FFFFFF'; context.font = `700 ${Math.round(output.height * .035)}px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif`; context.textAlign = 'center'; context.textBaseline = 'middle';
         context.fillText(caption.trim(), output.width / 2, output.height - captionSpace / 2, output.width * .9);
       }
       const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(value => value ? resolve(value) : reject(new Error('Kolaj oluşturulamadı.')), 'image/jpeg', .92));
