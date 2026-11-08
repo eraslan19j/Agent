@@ -83,9 +83,21 @@ jobs:
         shell: bash
         run: |
           set +e
-          ./gradlew assembleDebug --no-daemon > ../android-build.log 2>&1
-          STATUS=$?
-          cat ../android-build.log
+          STATUS=1
+          for attempt in 1 2 3; do
+            ./gradlew assembleDebug --no-daemon > ../android-build.log 2>&1
+            STATUS=$?
+            cat ../android-build.log
+            if [ "$STATUS" -eq 0 ]; then break; fi
+            if ! grep -Eqi 'Could not GET|Could not download|Read timed out|timeout \(|[[:space:]]504[[:space:]]|[[:space:]]502[[:space:]]|[[:space:]]503[[:space:]]' ../android-build.log; then
+              echo "Non-network build failure; not retrying."
+              break
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "Network dependency failure on attempt $attempt; retrying."
+              sleep $((attempt * 15))
+            fi
+          done
           if [ "$STATUS" -ne 0 ]; then
             ESCAPED_LOG=$(tail -n 45 ../android-build.log | sed -e 's/%/%25/g' -e 's/\r/%0D/g' | sed ':a;N;$!ba;s/\n/%0A/g')
             echo "::error::${ESCAPED_LOG}"
