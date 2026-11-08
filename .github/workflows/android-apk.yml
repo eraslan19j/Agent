@@ -67,6 +67,17 @@ jobs:
       - name: Build and synchronize Android assets
         run: npm run assets && npm run cap:sync
 
+      - name: Prepare Gradle wrapper with network retries
+        working-directory: android
+        shell: bash
+        run: |
+          for attempt in 1 2 3 4; do
+            if ./gradlew --version --no-daemon; then exit 0; fi
+            echo "Gradle distribution download attempt $attempt failed; retrying."
+            sleep $((attempt * 10))
+          done
+          exit 1
+
       - name: Assemble APK
         working-directory: android
         shell: bash
