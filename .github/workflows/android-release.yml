@@ -1,0 +1,82 @@
+name: Build signed Play Store AAB
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bundle-release:
+    name: Verify and bundle My Vision 1.3.0
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      MYVISION_KEYSTORE_BASE64: ${{ secrets.MYVISION_KEYSTORE_BASE64 }}
+      MYVISION_STORE_PASSWORD: ${{ secrets.MYVISION_STORE_PASSWORD }}
+      MYVISION_KEY_ALIAS: ${{ secrets.MYVISION_KEY_ALIAS }}
+      MYVISION_KEY_PASSWORD: ${{ secrets.MYVISION_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: arena/2abc0dfe-agent
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Check release secret configuration
+        shell: bash
+        run: |
+          for NAME in MYVISION_KEYSTORE_BASE64 MYVISION_STORE_PASSWORD MYVISION_KEY_ALIAS MYVISION_KEY_PASSWORD; do
+            if [ -z "${!NAME}" ]; then echo "::error::$NAME is required. Configure it in GitHub Actions secrets; never commit signing credentials."; exit 1; fi
+          done
+      - run: npm ci --no-audit --no-fund
+      - run: npm test && npm run lint && npm run build
+      - run: npm run assets && npm run cap:sync
+      - name: Materialize signing configuration outside the repository
+        shell: bash
+        run: |
+          umask 077
+          printf '%s' "$MYVISION_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/my-vision-release.jks"
+          {
+            printf 'storeFile=%s\n' "$RUNNER_TEMP/my-vision-release.jks"
+            printf 'storePassword=%s\n' "$MYVISION_STORE_PASSWORD"
+            printf 'keyAlias=%s\n' "$MYVISION_KEY_ALIAS"
+            printf 'keyPassword=%s\n' "$MYVISION_KEY_PASSWORD"
+          } > "$RUNNER_TEMP/my-vision-keystore.properties"
+      - name: Assemble signed AAB
+        working-directory: android
+        env:
+          MYVISION_KEYSTORE_PROPERTIES: ${{ runner.temp }}/my-vision-keystore.properties
+        run: ./gradlew bundleRelease --no-daemon
+      - name: Verify package metadata and signature
+        shell: bash
+        run: |
+          AAB=android/app/build/outputs/bundle/release/app-release.aab
+          test -s "$AAB"
+          jarsigner -verify "$AAB"
+          unzip -p "$AAB" base/manifest/AndroidManifest.xml > /dev/null
+          if unzip -Z1 "$AAB" | grep -q '\.so$'; then
+            echo "Native libraries found; inspect ELF LOAD alignment and test on a 16 KB device before Play upload."
+            unzip -Z1 "$AAB" | grep '\.so$'
+          else
+            echo "No native shared libraries: Java/Kotlin-only app supports 16 KB page sizes by construction."
+          fi
+          grep -q 'targetSdkVersion = 36' android/variables.gradle
+      - name: Copy signed release bundle
+        run: |
+          cp android/app/build/outputs/bundle/release/app-release.aab My-Vision-1.3.0-release.aab
+          sha256sum My-Vision-1.3.0-release.aab > My-Vision-1.3.0-release.aab.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: My-Vision-1.3.0-signed-play-aab
+          path: |
+            My-Vision-1.3.0-release.aab
+            My-Vision-1.3.0-release.aab.sha256
+          if-no-files-found: error
+          retention-days: 14

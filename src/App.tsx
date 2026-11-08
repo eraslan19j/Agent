@@ -21,8 +21,9 @@ import { Toast } from './components/Toast';
 import type { ToastMessage } from './components/Toast';
 import { preparePhoto } from './lib/imageEngine';
 import { applyPreferences, getDynamicAccent, loadPreferences, persistPreferences, watchSystemTheme, type AppPreferences } from './lib/preferences';
-import { hasOnboarded, loadPreviewPro, loadProjects, persistProjects, savePreviewPro, setOnboarded } from './lib/storage';
-import { hasNativePro, isNativeBillingAvailable, purchaseNativePlan, restoreNativePurchases } from './lib/billing';
+import { setLocalizationLanguage } from './lib/localization';
+import { hasOnboarded, loadProjects, persistProjects, setOnboarded } from './lib/storage';
+import { hasNativePro, isNativeBillingAvailable, listenForProUpdates, purchaseNativePlan, restoreNativePurchases } from './lib/billing';
 import type { DiscoverPhoto } from './lib/discoverService';
 import type { AppView, EditorSession, PhotoProject, PlanInterval } from './types';
 
@@ -31,7 +32,7 @@ export default function App() {
   const [projects, setProjects] = useState<PhotoProject[]>(() => loadProjects());
   const [session, setSession] = useState<EditorSession | null>(null);
   const [studio, setStudio] = useState<'collage' | 'batch' | null>(null);
-  const [isPro, setIsPro] = useState(() => loadPreviewPro());
+  const [isPro, setIsPro] = useState(false);
   const [onboardingOpen, setOnboardingOpen] = useState(() => !hasOnboarded());
   const [paywallOpen, setPaywallOpen] = useState(false);
   const [infoTopic, setInfoTopic] = useState<InfoTopic | null>(null);
@@ -87,8 +88,10 @@ export default function App() {
       if (Capacitor.isNativePlatform()) void SplashScreen.hide().catch(() => undefined);
       if (animationEnabled) splashTimer = window.setTimeout(() => setShowSplash(false), 360);
     }));
+    let removeBillingListener: () => void = () => undefined;
     if (isNativeBillingAvailable()) {
       void hasNativePro().then(setIsPro).catch(() => undefined);
+      void listenForProUpdates(setIsPro).then(remove => { if (!cancelled) removeBillingListener = remove; else remove(); }).catch(() => undefined);
     }
     return () => {
       cancelled = true;
@@ -96,6 +99,7 @@ export default function App() {
       window.clearTimeout(splashTimer);
       importTask.generation += 1;
       importTask.controller?.abort();
+      removeBillingListener();
       if (toastTimer.current) clearTimeout(toastTimer.current);
     };
   }, []);
@@ -103,6 +107,7 @@ export default function App() {
   useEffect(() => {
     let active = true;
     persistPreferences(preferences);
+    setLocalizationLanguage(preferences.language);
     const sync = () => {
       if (!active) return;
       applyPreferences(preferences);
@@ -256,30 +261,21 @@ export default function App() {
   };
 
   const purchase = async (interval: PlanInterval) => {
-    if (isNativeBillingAvailable()) {
-      const active = await purchaseNativePlan(interval);
-      if (!active) throw new Error('Satın alma tamamlandı ancak Pro erişimi henüz doğrulanamadı. Satın alımları geri yüklemeyi deneyin.');
-      setIsPro(true);
-    } else {
-      savePreviewPro(true);
-      setIsPro(true);
-    }
+    if (!isNativeBillingAvailable()) throw new Error('Satın alma yalnızca yapılandırılmış Android ve Google Play sürümünde kullanılabilir.');
+    const active = await purchaseNativePlan(interval);
+    if (!active) throw new Error('Satın alma tamamlandı ancak Pro erişimi henüz doğrulanamadı. Satın alımları geri yüklemeyi deneyin.');
+    setIsPro(true);
     setPaywallOpen(false);
-    showToast(isNativeBillingAvailable() ? 'My Vision Pro’ya hoş geldin!' : 'Pro önizleme etkin. Tüm araçları deneyebilirsin.');
+    showToast('My Vision Pro’ya hoş geldin!');
   };
 
   const restore = async () => {
-    if (isNativeBillingAvailable()) {
-      const active = await restoreNativePurchases();
-      setIsPro(active);
-      showToast(active ? 'Pro aboneliğin geri yüklendi.' : 'Bu hesapta aktif abonelik bulunamadı.', active ? 'success' : 'info');
-      if (!active) throw new Error('Bu Google Play hesabında aktif abonelik bulunamadı.');
-    } else {
-      const active = loadPreviewPro();
-      setIsPro(active);
-      showToast(active ? 'Pro önizleme zaten etkin.' : 'Bu tarayıcıda etkin Pro önizleme bulunamadı.', 'info');
-      if (!active) throw new Error('Bu tarayıcıda geri yüklenecek önizleme aboneliği yok.');
-    }
+    if (!isNativeBillingAvailable()) throw new Error('Geri yükleme yalnızca yapılandırılmış Android ve Google Play sürümünde kullanılabilir.');
+    const active = await restoreNativePurchases();
+    setIsPro(active);
+    if (!active) throw new Error('Bu Google Play hesabında aktif abonelik bulunamadı.');
+    showToast('Pro aboneliğin geri yüklendi.');
+    setPaywallOpen(false);
   };
 
   return (
@@ -300,8 +296,8 @@ export default function App() {
       </main>}
       {session && <PhotoEditor session={session} isPro={isPro} onClose={() => setSession(null)} onSave={saveProject} onRequirePro={() => setPaywallOpen(true)} onToast={showToast} />}
 
-      <input ref={fileInput} className="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => event.target.files?.[0] && handleFileInput(event.target.files[0], event.target)} />
-      <input ref={cameraInput} className="visually-hidden" type="file" accept="image/*" capture="environment" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; void importFile(file); }} />
+      <input ref={fileInput} className="visually-hidden" type="file" aria-label="Galeriden fotoğraf seç" accept="image/jpeg,image/png,image/webp" onChange={(event) => event.target.files?.[0] && handleFileInput(event.target.files[0], event.target)} />
+      <input ref={cameraInput} className="visually-hidden" type="file" aria-label="Kamera ile fotoğraf çek" accept="image/*" capture="environment" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; void importFile(file); }} />
 
       {onboardingOpen && <Onboarding onComplete={() => { setOnboarded(); setOnboardingOpen(false); }} />}
       {studio === 'collage' && <CollageStudio onClose={() => setStudio(null)} onToast={showToast} />}

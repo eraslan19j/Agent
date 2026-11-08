@@ -86,3 +86,21 @@
 - Kontrollü PNG: köşe alfa 0, kontrast subject içinde alfa 255; straighten JPG’de boş/siyah köşe yok; canlı histogram ve sentetik iki-parmak %200 zoom geçti.
 - Production Chromium ölçümü: açılış **724 ms**, 2800×700 ağır export **453 ms**, JS heap yaklaşık **12,7 MB**. Export sırasında bir **114 ms** ana-thread long task ölçüldü; canvas readback/writeback ana thread’de kaldığı için kesintisiz 120 Hz doğrulanmış sayılmaz.
 - Fiziksel Poco X7 Pro, HyperOS, 120 Hz ekran ve native bellek ölçümü yapılmadı.
+
+## Aşama 6 — Play uyumluluğu, satın alma ve erişilebilirlik
+
+- Sürüm **1.3.0 / versionCode 4**. Resmî Google Play hedef API rehberi doğrulandı: 31 Ağustos 2026 sonrası yeni uygulama/güncelleme için API 36; proje compile/target SDK 36.
+- AGP 8.13.0. Debug CI’ya `zipalign -c -P 16 -v 4` ve `.so` sayımı eklendi. Uygulama custom NDK kütüphanesi içermiyor; native kütüphane görülürse ELF ve 16 KB cihaz testi zorunlu. 1 Şubat 2027 yayın engeli tarihi dokümante edildi.
+- `android-release.yml`: yalnızca manuel, dört GitHub Actions secret’ıyla imzalı AAB üretir. Anahtar ve properties `$RUNNER_TEMP` içinde tutulur; secret yoksa iş başarısız olur ve imzasız paket yayınlanmaz. Bu ortamda secret olmadığı için imzalı AAB üretilmedi.
+- Eski `myvision.pro.preview` satın alma yolu ve localStorage’dan Pro yükleme kaldırıldı. Web’de satın alma/geri yükleme kapalı; native entitlement dinlemesi eklendi.
+- Paywall sabit ₺149,99/₺899,99, %50 ve koşulsuz 7 gün iddialarını kaldırdı. Fiyat `selected.product.priceString`, deneme gerçek default option FREE_TRIAL fazından okunur; paket yoksa CTA kapalı ve hata açık.
+- `.env.example` aylık/yıllık RevenueCat package ID alanlarını içeriyor. Gerçek Play/RevenueCat ürünleri yapılandırılmadığından satın alma işlemi yapılmadı.
+- TR/EN canlı arayüz, kalıcı dil tercihi, erişilebilir ad/placeholder çevirileri ve dinamik mağaza metinleri eklendi. `privacy-en.html`, `terms-en.html` ve İngilizce mağaza metni oluşturuldu.
+- İngilizce editörün Looks/Adjust/Crop/Color/Retouch/Create/Export ekranlarında görünür Türkçe metin taraması boş döndü. Dinamik preset/mağaza metinleri de çevriliyor.
+- Modal: ilk odak, Tab/Shift+Tab odağı sınırlama, Escape ve kapanışta odak iadesi; onClose değişiminde input odağının sıfırlanması regresyonu giderildi.
+- İkincil metinler 12 px’e yükseltildi, etiketsiz file/studio inputları ve mobil icon-only save/export erişilebilir adları eklendi. Açık/koyu tema kontrastları düzeltildi.
+- axe-core 4.14 WCAG 2 A/AA + 2.1 AA: **home, paywall, editor, editor-color, editor-retouch, editor-create, settings, settings-light, home-light, paywall-light — 10/10 ihlalsiz.**
+- E2E: TR/EN canlı geçiş + reload kalıcılığı, eski Pro bayrağının etkisizliği, sabit fiyat/deneme olmaması, kapalı web satın alma/restore ve İngilizce yasal linkler geçti.
+- Regresyon: Worker aktif gelişmiş editör, Worker kapalı JPG, PNG alfa/straighten/histogram/%200 pinch, 1080×1920 kolaj, iki batch JPG, watermark ve arşiv metadata akışları yeniden geçti.
+- 37 test, ESLint, TypeScript/Vite build ve `git diff --check` başarılı.
+- Yayın blokları: aktif destek adresi ve public HTTPS yasal URL’ler sağlanmalı; RevenueCat/Play ürünleri ve lisans test hesabı yapılandırılmalı; imza secret’ları eklenmeli; gerçek Android cihazlarda satın alma ve fiziksel Poco/HyperOS QA yapılmalı.

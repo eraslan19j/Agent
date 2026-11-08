@@ -23,6 +23,12 @@ Fotoğrafını döndür, aynala veya popüler oranlarla kırp. Instagram gönder
 **ÖNCE / SONRA**
 Düzenleme çizgisini sürükleyerek orijinal fotoğrafınla sonucu anında karşılaştır. Geri al, yinele ve tüm ayarları istediğin zaman sıfırla.
 
+**GELİŞMİŞ STÜDYO**
+Üç bölgeli Curves, yedi kanallı HSL, seçici maskeler, canlı histogram, perspektif düzeltme ve serbest kırpma kullan. Cihaz içi rötuş, metin/çıkartma/vektör katmanları, özel tarifler, gerçek kolaj ve filigranlı toplu üretimle çalışmanı tamamla. Arka plan kaldırma klasik kenar-rengi algoritmasıdır; AI olarak sunulmaz ve şeffaf PNG üretir.
+
+**ARŞİVİN SENİN KONTROLÜNDE**
+Gerçek projelerinde ara, favorilere ekle, albüm ve etiket oluştur. Türkçe veya İngilizce arayüz, AMOLED/açık/koyu temalar ve performans tercihlerini kullan.
+
 **CİHAZINDA, GİZLİLİK ODAKLI**
 Fotoğrafların düzenlenmek için başka bir sunucuya gönderilmez. Projelerin cihazında saklanır. Reklam takipçisi ve davranışsal reklam yoktur.
 

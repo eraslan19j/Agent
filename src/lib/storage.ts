@@ -1,7 +1,6 @@
 import type { PhotoProject } from '../types';
 
 const PROJECTS_KEY = 'myvision.projects.v1';
-const PRO_KEY = 'myvision.pro.preview';
 const ONBOARDING_KEY = 'myvision.onboarded.v1';
 
 export function loadProjects(): PhotoProject[] {
@@ -22,14 +21,6 @@ export function persistProjects(projects: PhotoProject[]): boolean {
   } catch {
     return false;
   }
-}
-
-export function loadPreviewPro() {
-  return localStorage.getItem(PRO_KEY) === 'true';
-}
-
-export function savePreviewPro(active: boolean) {
-  localStorage.setItem(PRO_KEY, String(active));
 }
 
 export function hasOnboarded() {

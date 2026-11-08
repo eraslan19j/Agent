@@ -1,5 +1,17 @@
 # My Vision sürüm notları
 
+## 1.3.0 — Android sürüm 4
+
+- Transferable ArrayBuffer kullanan ayrı pixel Worker, timeout/terminate ve Workersuz cihazlarda senkron fallback eklendi.
+- Curves, HSL, seçici maskeler, noise/sharpen, klasik cihaz içi arka plan kaldırma, rötuş, metin/çıkartma/vektör katmanları ve canlı histogram tamamlandı.
+- Serbest kırpma, straighten/perspective, PNG alfa, özel tarifler, gerçek kolaj, filigranlı batch ve aranabilir/favorili/albümlü proje arşivi eklendi.
+- İlk açılış onboarding’i, iki-parmak zoom, native geri/import iptali ve tam proje kalıcılığı iyileştirildi.
+- Arayüz TR/EN seçilebilir; yasal sayfaların İngilizce sürümleri eklendi.
+- Sahte web Pro aktivasyonu kaldırıldı. Native fiyat/deneme gerçek RevenueCat store product verisinden okunur; paket/API anahtarı yoksa satın alma kapalıdır.
+- Play target API 36 korunur; debug CI’da 16 KB zipalign/native-library denetimi ve secret’larla manuel imzalı AAB workflow’u eklendi.
+- Küçük metinler ve kontrast iyileştirildi; modal odak yönetimi eklendi. Ana/gelişmiş editör, paywall, ayarlar ve açık/koyu temalarda 10 axe WCAG A/AA taraması ihlalsiz geçti.
+- 37 birim testi, production build, ESLint, Worker açık/kapalı render, kolaj/batch ve TR/EN satın-alma E2E kontrolleri başarılı.
+
 ## 1.2.0 — Android sürüm 3
 
 ### Liquid Glass ve marka

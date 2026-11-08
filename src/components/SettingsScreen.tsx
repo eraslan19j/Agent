@@ -1,5 +1,5 @@
 import { Capacitor } from '@capacitor/core';
-import { ChevronLeft, Check, Monitor, Moon, Sun, Circle, RotateCcw, Palette, Layers3, Zap, Play } from 'lucide-react';
+import { ChevronLeft, Check, Monitor, Moon, Sun, Circle, RotateCcw, Palette, Layers3, Zap, Play, Languages } from 'lucide-react';
 import { DEFAULT_PREFERENCES, type AccentPreference, type AppPreferences, type InterfaceStyle, type ThemePreference } from '../lib/preferences';
 
 interface Props {
@@ -29,6 +29,9 @@ export default function SettingsScreen({ preferences, onChange, onBack }: Props)
   return <div className="settings-screen screen-enter">
     <header className="settings-header"><button className="icon-btn" onClick={onBack} aria-label="Geri"><ChevronLeft size={22} /></button><div><span className="settings-eyebrow">MY VISION</span><h1>Ayarlar</h1></div><button className="icon-btn" onClick={() => onChange({ ...DEFAULT_PREFERENCES })} aria-label="Görünümü sıfırla"><RotateCcw size={18} /></button></header>
     <div className="settings-scroll">
+      <section className="settings-section"><div className="settings-section-title"><Languages size={18} /><div><h2>Dil / Language</h2><p>Uygulama dilini seç. · Choose your app language.</p></div></div>
+        <div className="settings-segmented"><button className={preferences.language === 'tr' ? 'active' : ''} onClick={() => update('language', 'tr')} aria-pressed={preferences.language === 'tr'}>Türkçe</button><button className={preferences.language === 'en' ? 'active' : ''} onClick={() => update('language', 'en')} aria-pressed={preferences.language === 'en'}>English</button></div>
+      </section>
       <section className="settings-section"><div className="settings-section-title"><Palette size={18} /><div><h2>Görünüm</h2><p>Temayı ve uygulamanın vurgu rengini seç.</p></div></div>
         <div className="theme-options">{themes.map(({ id, label, description, icon: Icon }) => <button key={id} className={`theme-option ${preferences.theme === id ? 'active' : ''}`} onClick={() => update('theme', id)} aria-pressed={preferences.theme === id}><Icon size={19} /><span>{label}</span><small>{description}</small>{preferences.theme === id && <Check size={14} className="theme-check" />}</button>)}</div>
         <div className="accent-options">{accents.map(accent => <button key={accent.id} className={`accent-option ${preferences.accent === accent.id ? 'active' : ''}`} onClick={() => update('accent', accent.id)} aria-label={`${accent.label} vurgu`} aria-pressed={preferences.accent === accent.id} disabled={accent.id === 'dynamic' && !Capacitor.isNativePlatform()} title={accent.id === 'dynamic' && !Capacitor.isNativePlatform() ? 'Dinamik renk Android 12 ve üzerinde kullanılabilir' : accent.label}><span style={{ background: accent.color }} />{preferences.accent === accent.id && <Check size={13} />}<small>{accent.label}</small></button>)}</div>
@@ -44,7 +47,7 @@ export default function SettingsScreen({ preferences, onChange, onBack }: Props)
       <section className="settings-section"><div className="settings-section-title"><Zap size={18} /><div><h2>Performans</h2><p>Düzenleme motoru cihazında çalışır.</p></div></div>
         <div className="settings-facts"><div><span>Önizleme</span><strong>Ekran için ölçekli</strong></div><div><span>Dışa aktarma</span><strong>Kaynak çözünürlüğü</strong></div><div><span>Animasyon</span><strong>Transform + opacity</strong></div></div>
       </section>
-      <div className="settings-version"><Play size={13} /><span>My Vision 1.2.0 · Ayarlar anında kaydedilir</span></div>
+      <div className="settings-version"><Play size={13} /><span>My Vision 1.3.0 · Ayarlar anında kaydedilir</span></div>
     </div>
   </div>;
 }

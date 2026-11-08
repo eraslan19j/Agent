@@ -86,9 +86,9 @@ export function CollageStudio({ onClose, onToast }: { onClose: () => void; onToa
       <aside className="studio-controls"><section><h2>Format</h2><div className="settings-segmented">{(Object.keys(formats) as Format[]).map(key => <button key={key} className={format === key ? 'active' : ''} onClick={() => setFormat(key)}>{formats[key].label}</button>)}</div></section>
         <section><h2>Görünüm</h2><select value={presetId} onChange={event => setPresetId(event.target.value)}>{PRESETS.filter(preset => !preset.pro || ['portrait', 'cinema', 'noir', 'landscape', 'food', 'vintage'].includes(preset.id)).map(preset => <option key={preset.id} value={preset.id}>{preset.name}</option>)}</select></section>
         <section><EditorSlider label="Fotoğraf aralığı" value={gap} min={0} max={40} onChange={setGap} /><div className="creative-options"><input type="color" value={background} onChange={event => setBackground(event.target.value)} aria-label="Kolaj arka planı" /><span>Arka plan</span></div></section>
-        <section><h2>Alt yazı</h2><input className="studio-text-input" value={caption} onChange={event => setCaption(event.target.value.slice(0, 70))} placeholder="İsteğe bağlı kolaj başlığı" /></section>
+        <section><h2>Alt yazı</h2><input className="studio-text-input" aria-label="Alt yazı" value={caption} onChange={event => setCaption(event.target.value.slice(0, 70))} placeholder="İsteğe bağlı kolaj başlığı" /></section>
         <button className="button button--outline studio-add" onClick={() => inputRef.current?.click()} disabled={busy || items.length >= 6}><ImagePlus size={17} /> Fotoğraf ekle ({items.length}/6)</button>
       </aside></div>
-    <input ref={inputRef} className="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={event => void addFiles(event.target.files)} />
+    <input ref={inputRef} className="visually-hidden" type="file" aria-label="Fotoğraf dosyalarını seç" accept="image/jpeg,image/png,image/webp" multiple onChange={event => void addFiles(event.target.files)} />
   </div>;
 }
