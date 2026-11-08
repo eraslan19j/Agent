@@ -104,3 +104,13 @@
 - Regresyon: Worker aktif gelişmiş editör, Worker kapalı JPG, PNG alfa/straighten/histogram/%200 pinch, 1080×1920 kolaj, iki batch JPG, watermark ve arşiv metadata akışları yeniden geçti.
 - 37 test, ESLint, TypeScript/Vite build ve `git diff --check` başarılı.
 - Yayın blokları: aktif destek adresi ve public HTTPS yasal URL’ler sağlanmalı; RevenueCat/Play ürünleri ve lisans test hesabı yapılandırılmalı; imza secret’ları eklenmeli; gerçek Android cihazlarda satın alma ve fiziksel Poco/HyperOS QA yapılmalı.
+
+## Native Android paket sonucu
+
+- Son CI: https://github.com/eraslan19j/Agent/actions/runs/42463266756 — **success**; test/lint, web build, Capacitor sync, `assembleDebug`, target SDK 36 ve 16 KB zipalign adımları geçti.
+- İndirilebilir APK: https://github.com/eraslan19j/Agent/releases/download/my-vision-v1.3.0-debug/My-Vision-1.3.0-debug.apk
+- Release: https://github.com/eraslan19j/Agent/releases/tag/my-vision-v1.3.0-debug — APK boyutu **10.629.965 bayt**.
+- CI’nın üretip release notuna yazdığı SHA-256: **`eb3c560fbcdeb2be5cd3596a038f3a1beac18417ce1e8bbedc25456820262b8d`**. Ayrı `.sha256` asset’i de yayımlandı.
+- Sandbox release-assets hostuna yönlendirilen indirmeyi tamamlayamadığı için APK yerel olarak ikinci kez indirilip kurulmadı; hash değeri CI çıktısıdır.
+- `store/screenshots/` üç görseli güncel 1.3.0 arayüzüyle 900×2000 olarak yenilendi. Bunlar gerçek uygulamanın kontrollü Chromium görüntüleridir; fiziksel Android ekran görüntüsü iddiası değildir.
+- İmzalı Play AAB workflow’u hazır fakat secret bulunmadığından çalıştırılmadı. Debug APK fiziksel Poco X7 Pro/HyperOS veya başka bir cihazda kurulup test edilmedi.
