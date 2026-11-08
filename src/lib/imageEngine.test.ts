@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS } from '../data/presets';
-import { buildCssFilter, computeCrop, normalizedRotation, orientationDimensions, outputDimensions, previewDimensions, readJpegDimensions, readJpegOrientation } from './imageEngine';
+import { buildCssFilter, canvasBackingSize, computeCrop, normalizedRotation, orientationDimensions, outputDimensions, previewDimensions, readJpegDimensions, readJpegOrientation } from './imageEngine';
 
 describe('image engine geometry', () => {
   it('crops a landscape source to a centered square', () => {
@@ -57,6 +57,28 @@ describe('image engine geometry', () => {
   it('fits a panorama without distorting its aspect ratio', () => {
     const preview = previewDimensions(360, 700, 4000, 1000, DEFAULT_SETTINGS);
     expect(preview).toMatchObject({ width: 360, height: 90, aspectRatio: 4 });
+  });
+
+  it('contains extra-long and 8000px sources without upscaling the stage', () => {
+    expect(previewDimensions(320, 500, 1000, 4000, DEFAULT_SETTINGS)).toMatchObject({ width: 125, height: 500, aspectRatio: .25 });
+    const large = previewDimensions(320, 500, 8000, 8000, DEFAULT_SETTINGS);
+    expect(large).toMatchObject({ width: 320, height: 320, aspectRatio: 1 });
+  });
+});
+
+describe('canvas backing resolution', () => {
+  it('matches CSS size times device pixel ratio', () => {
+    expect(canvasBackingSize(320, 180, 2)).toEqual({ width: 640, height: 360, ratio: 2 });
+  });
+
+  it('caps the backing store to the mobile pixel budget', () => {
+    const result = canvasBackingSize(2000, 2000, 3, 1_000_000);
+    expect(result.width * result.height).toBeLessThanOrEqual(1_002_000);
+    expect(result.ratio).toBeLessThan(1);
+  });
+
+  it('handles an unmeasured container safely', () => {
+    expect(canvasBackingSize(0, 0, 2)).toEqual({ width: 0, height: 0, ratio: 1 });
   });
 });
 

@@ -7,7 +7,7 @@ import {
   ZoomIn, ZoomOut, Copy, Clipboard, Plus, Trash2, BarChart3,
 } from 'lucide-react';
 import { AUTO_ENHANCE_SETTINGS, getPreset, PRESETS } from '../data/presets';
-import { buildCssFilter, computeSettingsCrop, createThumbnail, freshSettings, hasAdvancedRendering, loadImage, outputDimensions, previewDimensions, renderPhoto } from '../lib/imageEngine';
+import { buildCssFilter, canvasBackingSize, computeSettingsCrop, createThumbnail, freshSettings, hasAdvancedRendering, loadImage, outputDimensions, previewDimensions, renderPhoto } from '../lib/imageEngine';
 import { copySettings, deleteRecipe, loadRecipes, pasteSettings, saveRecipe, type CustomRecipe } from '../lib/recipes';
 import { downloadBlob, shareProject } from '../lib/downloads';
 import { textAvailableRatio } from '../lib/textLayout';
@@ -130,7 +130,9 @@ export function PhotoEditor({ session, onClose, onSave, onToast }: PhotoEditorPr
     let active = true;
     const timer = window.setTimeout(() => {
       setPreviewBusy(true);
-      const maxDimension = Math.min(1100, Math.max(480, Math.ceil(Math.max(stageBounds.width, stageBounds.height) * Math.min(2, window.devicePixelRatio || 1))));
+      const cssSize = previewDimensions(stageBounds.width, stageBounds.height, imageSize.width, imageSize.height, settings);
+      const backing = canvasBackingSize(cssSize.width, cssSize.height, window.devicePixelRatio || 1);
+      const maxDimension = Math.max(1, backing.width, backing.height);
       void renderPhoto(session.source, settings, { format: 'jpeg', quality: .82, maxDimension }).then(async blob => {
         if (!active) return;
         setAdvancedPreview(URL.createObjectURL(blob));
@@ -139,7 +141,7 @@ export function PhotoEditor({ session, onClose, onSave, onToast }: PhotoEditorPr
       }).finally(() => { if (active) setPreviewBusy(false); });
     }, 140);
     return () => { active = false; window.clearTimeout(timer); };
-  }, [advanced, settings, session.source, imageSize.width, stageBounds.width, stageBounds.height, onToast]);
+  }, [advanced, settings, session.source, imageSize.width, imageSize.height, stageBounds.width, stageBounds.height, onToast]);
 
   useEffect(() => () => { if (advancedPreview) URL.revokeObjectURL(advancedPreview); }, [advancedPreview]);
 
@@ -291,15 +293,15 @@ export function PhotoEditor({ session, onClose, onSave, onToast }: PhotoEditorPr
   const previewScale = crop ? previewImageWidth / crop.width : 1;
   const cropOffsetX = crop ? (imageSize.width / 2 - crop.x - crop.width / 2) * previewScale : 0;
   const cropOffsetY = crop ? (imageSize.height / 2 - crop.y - crop.height / 2) * previewScale : 0;
-  const transform = `translate(-50%, -50%) rotate(${settings.rotation}deg) scale(${settings.flipHorizontal ? -1 : 1}, ${settings.flipVertical ? -1 : 1}) translate(${cropOffsetX}px, ${cropOffsetY}px)`;
+  const transform = `rotate(${settings.rotation}deg) scale(${settings.flipHorizontal ? -1 : 1}, ${settings.flipVertical ? -1 : 1}) translate(${cropOffsetX}px, ${cropOffsetY}px)`;
   const previewImageStyle: React.CSSProperties = {
     width: crop ? imageSize.width * previewScale : '100%',
     height: crop ? imageSize.height * previewScale : '100%',
     maxWidth: 'none',
-    objectFit: 'fill',
+    objectFit: 'contain',
     transform,
   };
-  const advancedImageStyle: React.CSSProperties = { left: 0, top: 0, width: '100%', height: '100%', objectFit: 'fill', transform: 'none' };
+  const advancedImageStyle: React.CSSProperties = { left: 0, top: 0, width: '100%', height: '100%', objectFit: 'contain', transform: 'none' };
 
   return (
     <div className="editor-shell">

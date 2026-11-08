@@ -81,6 +81,17 @@ export function previewDimensions(containerWidth: number, containerHeight: numbe
   };
 }
 
+export function canvasBackingSize(cssWidth: number, cssHeight: number, devicePixelRatio: number, maxPixels = 2_000_000) {
+  if (cssWidth <= 0 || cssHeight <= 0) return { width: 0, height: 0, ratio: 1 };
+  const requestedRatio = Math.max(1, devicePixelRatio || 1);
+  const ratio = Math.min(requestedRatio, Math.sqrt(maxPixels / (cssWidth * cssHeight)));
+  return {
+    width: Math.max(1, Math.round(cssWidth * ratio)),
+    height: Math.max(1, Math.round(cssHeight * ratio)),
+    ratio,
+  };
+}
+
 export function outputDimensions(width: number, height: number, settings: EditSettings, maxDimension: number) {
   const crop = computeSettingsCrop(width, height, settings);
   const quarterTurn = normalizedRotation(settings.rotation) % 180 !== 0;
