@@ -104,41 +104,6 @@ export function loadImage(source: string): Promise<HTMLImageElement> {
   });
 }
 
-function applyPixelAdjustments(context: CanvasRenderingContext2D, width: number, height: number, settings: EditSettings) {
-  if (!settings.highlights && !settings.shadows && !settings.temperature && !settings.grain && !settings.fade) return;
-  const pixels = context.getImageData(0, 0, width, height);
-  const data = pixels.data;
-  let seed = 419;
-  const random = () => {
-    seed = (seed * 16807) % 2147483647;
-    return (seed - 1) / 2147483646;
-  };
-
-  for (let index = 0; index < data.length; index += 4) {
-    let red = data[index];
-    let green = data[index + 1];
-    let blue = data[index + 2];
-    const luminance = (red * 0.2126 + green * 0.7152 + blue * 0.0722) / 255;
-    const highlightWeight = Math.max(0, (luminance - 0.45) / 0.55);
-    const shadowWeight = Math.max(0, (0.55 - luminance) / 0.55);
-    const toneFactor = 1 + (settings.highlights / 100) * highlightWeight * 0.65 + (settings.shadows / 100) * shadowWeight * 0.65;
-    const noise = settings.grain ? (random() - 0.5) * settings.grain * 0.48 : 0;
-    red = red * toneFactor + settings.temperature * 0.22 + noise;
-    green = green * toneFactor + noise;
-    blue = blue * toneFactor - settings.temperature * 0.22 + noise;
-    if (settings.fade) {
-      const lift = settings.fade * 0.18;
-      red += lift;
-      green += lift;
-      blue += lift;
-    }
-    data[index] = Math.max(0, Math.min(255, red));
-    data[index + 1] = Math.max(0, Math.min(255, green));
-    data[index + 2] = Math.max(0, Math.min(255, blue));
-  }
-  context.putImageData(pixels, 0, 0);
-}
-
 function applyVignette(context: CanvasRenderingContext2D, width: number, height: number, amount: number) {
   if (!amount) return;
   const gradient = context.createRadialGradient(width / 2, height / 2, Math.min(width, height) * 0.18, width / 2, height / 2, Math.max(width, height) * 0.72);
@@ -180,8 +145,7 @@ export async function renderPhoto(source: string, settings: EditSettings, option
     crop.height * scale * cover,
   );
   context.restore();
-  applyPixelAdjustments(context, canvas.width, canvas.height, settings);
-  applyAdvancedRendering(context, canvas.width, canvas.height, settings);
+  await applyAdvancedRendering(context, canvas.width, canvas.height, settings);
   applyVignette(context, canvas.width, canvas.height, settings.vignette);
 
   return new Promise((resolve, reject) => {

@@ -74,3 +74,15 @@
 - Kolaj çıktısı Sharp ile **1080×1920** doğrulandı; batch iki ayrı JPG üretti; favori/albüm/etiket araması geçti.
 - Regresyon: Noir %85 ve proje kimliği, Discover 503/retry/iptal/Escape/scroll temizliği, EXIF 200×400, dikey ve panorama merkezleme yeniden geçti.
 - Production build, ESLint ve 33 test başarılı. Fiziksel cihaz ölçümü yapılmadı.
+
+## Aşama 5 — Worker, bellek ve ölçülen performans
+
+- Base tone/grain, noise/sharpen, Curves/HSL, maskeler, kırmızı göz ve arka plan alfa işlemleri saf `pixelProcessing` fonksiyonuna ayrıştırıldı.
+- Vite ayrı `pixelWorker` bundle’ı üretiyor; `ArrayBuffer` transfer kopyalama yerine sahiplik aktarıyor. Worker yoksa/oluşturulamazsa aynı saf pipeline ana thread fallback’iyle çalışıyor. Timeout’ta worker terminate ediliyor.
+- Gelişmiş önizleme en fazla 1100 px; export kaynak çözünürlüğü ve 2800 px kaynak hazırlama sınırı korunuyor. Preview blob URL’leri revoke ediliyor.
+- Layout animasyonu yerine photo-stage transform geçişi; onboarding indicator transform/opacity kullanımı eklendi.
+- Piksel merkezi koordinat düzeltmesi unit testle yakalandı ve uygulandı. Neutral pixel, lokal maske, kırmızı göz ve border-background alfa testleri eklendi; toplam 37 test geçti.
+- Worker açıkken gelişmiş editör ve batch yeniden geçti. Worker tamamen devre dışıyken Curves + JPG export geçti.
+- Kontrollü PNG: köşe alfa 0, kontrast subject içinde alfa 255; straighten JPG’de boş/siyah köşe yok; canlı histogram ve sentetik iki-parmak %200 zoom geçti.
+- Production Chromium ölçümü: açılış **724 ms**, 2800×700 ağır export **453 ms**, JS heap yaklaşık **12,7 MB**. Export sırasında bir **114 ms** ana-thread long task ölçüldü; canvas readback/writeback ana thread’de kaldığı için kesintisiz 120 Hz doğrulanmış sayılmaz.
+- Fiziksel Poco X7 Pro, HyperOS, 120 Hz ekran ve native bellek ölçümü yapılmadı.
