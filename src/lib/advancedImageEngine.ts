@@ -73,8 +73,8 @@ export function hasAdvancedRendering(settings: EditSettings) {
     settings.masks.length || settings.texts.length || settings.frame.width);
 }
 
-export async function applyAdvancedRendering(context: CanvasRenderingContext2D, width: number, height: number, settings: EditSettings) {
-  await processCanvasPixels(context, width, height, settings);
+export async function applyAdvancedRendering(context: CanvasRenderingContext2D, width: number, height: number, settings: EditSettings, signal?: AbortSignal) {
+  await processCanvasPixels(context, width, height, settings, signal);
   applyPerspective(context, width, height, settings);
   drawCreativeLayers(context, width, height, settings);
 }

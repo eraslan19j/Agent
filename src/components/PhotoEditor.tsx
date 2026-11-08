@@ -83,6 +83,8 @@ export function PhotoEditor({ session, onClose, onSave, onToast }: PhotoEditorPr
   const [recipes, setRecipes] = useState<CustomRecipe[]>(() => loadRecipes());
   const [recipeName, setRecipeName] = useState('');
   const sliderStart = useRef<EditSettings | null>(null);
+  const settingsFrame = useRef<number | null>(null);
+  const queuedSettings = useRef<EditSettings | null>(null);
   const layerGesture = useRef<{ kind: 'text' | 'mask'; id: string; rect: DOMRect } | null>(null);
   const touchPoints = useRef(new Map<number, { x: number; y: number }>());
   const pinchStart = useRef<{ distance: number; zoom: number } | null>(null);
@@ -130,24 +132,47 @@ export function PhotoEditor({ session, onClose, onSave, onToast }: PhotoEditorPr
   useEffect(() => {
     if (!advanced || !imageSize.width || !stageBounds.width) return;
     let active = true;
+    const controller = new AbortController();
     const timer = window.setTimeout(() => {
       setPreviewBusy(true);
       const cssSize = previewDimensions(stageBounds.width, stageBounds.height, imageSize.width, imageSize.height, settings);
       const backing = canvasBackingSize(cssSize.width, cssSize.height, window.devicePixelRatio || 1);
       const maxDimension = Math.max(1, backing.width, backing.height);
-      void renderPhoto(previewSource, settings, { format: 'jpeg', quality: .82, maxDimension }).then(async blob => {
+      void renderPhoto(previewSource, settings, { format: 'jpeg', quality: .82, maxDimension, signal: controller.signal }).then(blob => {
         if (!active) return;
         setAdvancedPreview(URL.createObjectURL(blob));
-      }).catch(() => {
-        if (active) onToast('Gelişmiş önizleme oluşturulamadı; dışa aktarmada daha küçük boyut deneyin.', 'info');
+      }).catch(reason => {
+        if (active && !(reason instanceof DOMException && reason.name === 'AbortError')) onToast('Gelişmiş önizleme oluşturulamadı; dışa aktarmada daha küçük boyut deneyin.', 'info');
       }).finally(() => { if (active) setPreviewBusy(false); });
-    }, 140);
-    return () => { active = false; window.clearTimeout(timer); };
+    }, 120);
+    return () => { active = false; window.clearTimeout(timer); controller.abort(); };
   }, [advanced, settings, previewSource, imageSize.width, imageSize.height, stageBounds.width, stageBounds.height, onToast]);
 
   useEffect(() => () => { if (advancedPreview) URL.revokeObjectURL(advancedPreview); }, [advancedPreview]);
+  useEffect(() => () => { if (settingsFrame.current !== null) cancelAnimationFrame(settingsFrame.current); }, []);
+
+  const cancelQueuedSettings = () => {
+    if (settingsFrame.current !== null) cancelAnimationFrame(settingsFrame.current);
+    settingsFrame.current = null; queuedSettings.current = null;
+  };
+  const flushQueuedSettings = () => {
+    if (settingsFrame.current !== null) cancelAnimationFrame(settingsFrame.current);
+    settingsFrame.current = null;
+    const next = queuedSettings.current; queuedSettings.current = null;
+    if (next) setSettings(next);
+  };
+  const queueSettings = (updater: (current: EditSettings) => EditSettings) => {
+    queuedSettings.current = updater(queuedSettings.current ?? settings);
+    if (settingsFrame.current !== null) return;
+    settingsFrame.current = requestAnimationFrame(() => {
+      const next = queuedSettings.current;
+      settingsFrame.current = null; queuedSettings.current = null;
+      if (next) setSettings(next);
+    });
+  };
 
   const commit = (patch: Partial<EditSettings>, base?: EditSettings) => {
+    cancelQueuedSettings();
     setHistory((items) => [...items.slice(-39), base || settings]);
     setFuture([]);
     setSettings((current) => ({ ...current, ...patch }));
@@ -155,10 +180,11 @@ export function PhotoEditor({ session, onClose, onSave, onToast }: PhotoEditorPr
 
   const updateSlider = (key: keyof EditSettings, value: number) => {
     if (!sliderStart.current) sliderStart.current = settings;
-    setSettings((current) => ({ ...current, [key]: value }));
+    queueSettings(current => ({ ...current, [key]: value }));
   };
 
   const endSlider = () => {
+    flushQueuedSettings();
     if (sliderStart.current) {
       setHistory((items) => [...items.slice(-39), sliderStart.current!]);
       setFuture([]);
@@ -167,10 +193,11 @@ export function PhotoEditor({ session, onClose, onSave, onToast }: PhotoEditorPr
   };
 
   const startHistory = () => { if (!sliderStart.current) sliderStart.current = settings; };
-  const live = (patch: Partial<EditSettings>) => setSettings(current => ({ ...current, ...patch }));
-  const liveSettings = (updater: (current: EditSettings) => EditSettings) => setSettings(updater);
+  const live = (patch: Partial<EditSettings>) => queueSettings(current => ({ ...current, ...patch }));
+  const liveSettings = (updater: (current: EditSettings) => EditSettings) => queueSettings(updater);
 
   const undo = () => {
+    cancelQueuedSettings();
     const previous = history.at(-1);
     if (!previous) return;
     setFuture((items) => [settings, ...items]);
@@ -179,6 +206,7 @@ export function PhotoEditor({ session, onClose, onSave, onToast }: PhotoEditorPr
   };
 
   const redo = () => {
+    cancelQueuedSettings();
     const next = future[0];
     if (!next) return;
     setHistory((items) => [...items, settings]);
@@ -336,7 +364,7 @@ export function PhotoEditor({ session, onClose, onSave, onToast }: PhotoEditorPr
               {showGrid && <div className="composition-grid"><i /><i /><i /><i /></div>}
               {compare && <><span className="compare-label compare-label--before">ÖNCE</span><span className="compare-label compare-label--after">SONRA</span><div className="compare-line" style={{ left: `${comparePosition}%` }}><span><Columns2 size={16} /></span></div><input className="compare-range" type="range" min="0" max="100" value={comparePosition} onChange={(event) => setComparePosition(Number(event.target.value))} aria-label="Önce ve sonra karşılaştırması" /></>}
               <span className="preset-indicator">{currentPreset.name}{settings.intensity > 0 && currentPreset.id !== 'original' ? ` · ${settings.intensity}%` : ''}</span>
-              {previewBusy && <span className="advanced-preview-status"><LoaderCircle className="spin" size={12} /> Önizleme</span>}
+              {previewBusy && advanced && <span className="advanced-preview-status"><LoaderCircle className="spin" size={12} /> Önizleme</span>}
               {showHistogram && <PhotoHistogram source={previewSource} settings={settings} />}
             </div>
           </div>

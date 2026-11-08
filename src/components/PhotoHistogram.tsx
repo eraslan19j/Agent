@@ -7,8 +7,9 @@ export function PhotoHistogram({ source, settings }: { source: string; settings:
   const [bins, setBins] = useState<number[]>(empty);
   useEffect(() => {
     let active = true;
+    const controller = new AbortController();
     const timer = window.setTimeout(() => {
-      void renderPhoto(source, settings, { format: 'jpeg', quality: .65, maxDimension: 256 }).then(async blob => {
+      void renderPhoto(source, settings, { format: 'jpeg', quality: .65, maxDimension: 256, signal: controller.signal }).then(async blob => {
         const bitmap = await createImageBitmap(blob);
         if (!active) { bitmap.close(); return; }
         const canvas = document.createElement('canvas'); canvas.width = 96; canvas.height = 64;
@@ -24,7 +25,7 @@ export function PhotoHistogram({ source, settings }: { source: string; settings:
         if (active) setBins(values.map(value => value / max));
       }).catch(() => undefined);
     }, 260);
-    return () => { active = false; window.clearTimeout(timer); };
+    return () => { active = false; window.clearTimeout(timer); controller.abort(); };
   }, [source, settings]);
   return <div className="photo-histogram" role="img" aria-label="Düzenlenen fotoğrafın 48 bölgeli canlı luminans histogramı"><div>{bins.map((value, index) => <i key={index} style={{ transform: `scaleY(${Math.max(.015, value)})` }} />)}</div><span>GÖLGELER</span><span>ORTA TON</span><span>PARLAK</span></div>;
 }

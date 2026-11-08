@@ -126,7 +126,9 @@ function applyVignette(context: CanvasRenderingContext2D, width: number, height:
 }
 
 export async function renderPhoto(source: string, settings: EditSettings, options: ExportOptions): Promise<Blob> {
+  if (options.signal?.aborted) throw new DOMException('Önizleme işlemi iptal edildi.', 'AbortError');
   const image = await loadImage(source);
+  if (options.signal?.aborted) throw new DOMException('Önizleme işlemi iptal edildi.', 'AbortError');
   const dimensions = outputDimensions(image.naturalWidth, image.naturalHeight, settings, options.maxDimension);
   const canvas = document.createElement('canvas');
   canvas.width = dimensions.width;
@@ -156,12 +158,13 @@ export async function renderPhoto(source: string, settings: EditSettings, option
     crop.height * scale * cover,
   );
   context.restore();
-  await applyAdvancedRendering(context, canvas.width, canvas.height, settings);
+  await applyAdvancedRendering(context, canvas.width, canvas.height, settings, options.signal);
   applyVignette(context, canvas.width, canvas.height, settings.vignette);
 
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => {
-      if (blob) resolve(blob);
+      if (options.signal?.aborted) reject(new DOMException('Önizleme işlemi iptal edildi.', 'AbortError'));
+      else if (blob) resolve(blob);
       else reject(new Error('Fotoğraf oluşturulamadı. Daha küçük bir boyut deneyin.'));
     }, `image/${options.format}`, options.quality);
   });
