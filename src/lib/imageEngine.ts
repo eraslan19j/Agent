@@ -244,32 +244,54 @@ function applyExifTransform(context: CanvasRenderingContext2D, orientation: numb
   }
 }
 
-export async function preparePhoto(file: File): Promise<string> {
+export interface PreparedPhoto {
+  source: string;
+  previewSource: string;
+  width: number;
+  height: number;
+}
+
+export function releasePreparedPhoto(photo: PreparedPhoto) {
+  if (photo.source.startsWith('blob:')) URL.revokeObjectURL(photo.source);
+  if (photo.previewSource !== photo.source && photo.previewSource.startsWith('blob:')) URL.revokeObjectURL(photo.previewSource);
+}
+
+function canvasBlob(canvas: HTMLCanvasElement, type: string, quality: number): Promise<Blob> {
+  return new Promise((resolve, reject) => canvas.toBlob(blob => {
+    if (blob) resolve(blob);
+    else reject(new Error('Fotoğraf bellekte hazırlanamadı. Daha küçük bir fotoğraf deneyin.'));
+  }, type, quality));
+}
+
+function blobDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error('Dosya okunamadı.'));
+    reader.readAsDataURL(blob);
+  });
+}
+
+/** Keeps the original for export and creates a bounded, EXIF-oriented preview proxy. */
+export async function preparePhotoAsset(file: File, maxDimension = 1600): Promise<PreparedPhoto> {
   if (!file.type.startsWith('image/')) throw new Error('Lütfen JPG, PNG veya WebP formatında bir fotoğraf seçin.');
   if (file.size > 30 * 1024 * 1024) throw new Error('Fotoğraf 30 MB sınırını aşıyor.');
   const isJpeg = file.type === 'image/jpeg' || file.type === 'image/jpg';
   const jpegBuffer = isJpeg ? await file.arrayBuffer() : null;
   const orientation = jpegBuffer ? readJpegOrientation(jpegBuffer) : 1;
-  const dataUrl = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(new Error('Dosya okunamadı.'));
-    reader.onabort = () => reject(new DOMException('Dosya okuma iptal edildi.', 'AbortError'));
-    reader.readAsDataURL(file);
-  });
-
+  const source = URL.createObjectURL(file);
+  let previewSource: string | null = null;
   let bitmap: ImageBitmap | null = null;
-  let fallbackImage: HTMLImageElement | null = null;
   try {
     if (typeof createImageBitmap === 'function') {
       try { bitmap = await createImageBitmap(file, { imageOrientation: 'none' }); } catch { bitmap = null; }
     }
-    if (!bitmap) fallbackImage = await loadImage(dataUrl);
-    const source = bitmap ?? fallbackImage!;
+    const fallbackImage = bitmap ? null : await loadImage(source);
+    const drawable = bitmap ?? fallbackImage!;
     const rawWidth = bitmap ? bitmap.width : fallbackImage!.naturalWidth;
     const rawHeight = bitmap ? bitmap.height : fallbackImage!.naturalHeight;
-    // Some Chromium/WebView versions ignore imageOrientation:'none' and return an
-    // already-oriented bitmap. Compare SOF dimensions to avoid rotating it twice.
+    // Some Chromium/WebView versions ignore imageOrientation:'none'. Compare SOF
+    // dimensions to avoid rotating an already-oriented bitmap a second time.
     let effectiveOrientation = bitmap ? orientation : 1;
     if (bitmap && jpegBuffer && orientation !== 1) {
       const encoded = readJpegDimensions(jpegBuffer);
@@ -281,8 +303,9 @@ export async function preparePhoto(file: File): Promise<string> {
       if (decoderAppliedExif) effectiveOrientation = 1;
     }
     const oriented = orientationDimensions(rawWidth, rawHeight, effectiveOrientation);
-    const maxDimension = 2800;
-    if (orientation === 1 && effectiveOrientation === 1 && Math.max(oriented.width, oriented.height) <= maxDimension) return dataUrl;
+    if (effectiveOrientation === 1 && Math.max(oriented.width, oriented.height) <= maxDimension) {
+      return { source, previewSource: source, width: oriented.width, height: oriented.height };
+    }
 
     const scale = Math.min(1, maxDimension / Math.max(oriented.width, oriented.height));
     const canvas = document.createElement('canvas');
@@ -294,10 +317,28 @@ export async function preparePhoto(file: File): Promise<string> {
     context.imageSmoothingQuality = 'high';
     context.scale(scale, scale);
     applyExifTransform(context, effectiveOrientation, rawWidth, rawHeight);
-    context.drawImage(source, 0, 0);
-    return canvas.toDataURL(file.type === 'image/png' ? 'image/png' : 'image/jpeg', 0.9);
+    context.drawImage(drawable, 0, 0);
+    const outputType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+    const preview = await canvasBlob(canvas, outputType, .86);
+    previewSource = URL.createObjectURL(preview);
+    return { source, previewSource, width: oriented.width, height: oriented.height };
+  } catch (reason) {
+    if (previewSource) URL.revokeObjectURL(previewSource);
+    URL.revokeObjectURL(source);
+    throw reason;
   } finally {
     bitmap?.close();
+  }
+}
+
+/** Compatibility path for collage/batch previews, which do not retain originals. */
+export async function preparePhoto(file: File): Promise<string> {
+  const prepared = await preparePhotoAsset(file, 2800);
+  try {
+    const response = await fetch(prepared.previewSource);
+    return await blobDataUrl(await response.blob());
+  } finally {
+    releasePreparedPhoto(prepared);
   }
 }
 

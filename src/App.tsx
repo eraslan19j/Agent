@@ -17,7 +17,7 @@ import { InfoModal } from './components/InfoModal';
 import { MyVisionLogo } from './components/MyVisionLogo';
 import { Toast } from './components/Toast';
 import type { ToastMessage } from './components/Toast';
-import { preparePhoto } from './lib/imageEngine';
+import { preparePhotoAsset, releasePreparedPhoto } from './lib/imageEngine';
 import { applyPreferences, loadPreferences, persistPreferences, watchSystemTheme, type AppPreferences } from './lib/preferences';
 import { setLocalizationLanguage } from './lib/localization';
 import { deleteStoredProject, hasOnboarded, initializeStorage, releaseProjectUrls, saveStoredProject, setOnboarded, updateStoredProject } from './lib/storage';
@@ -26,6 +26,8 @@ import type { AppView, EditorSession, PhotoProject } from './types';
 export default function App() {
   const [view, setView] = useState<AppView>('home');
   const [projects, setProjects] = useState<PhotoProject[]>([]);
+  const projectsRef = useRef<PhotoProject[]>([]);
+  const sessionRef = useRef<EditorSession | null>(null);
   const [storageStatus, setStorageStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [session, setSession] = useState<EditorSession | null>(null);
   const [studio, setStudio] = useState<'collage' | 'batch' | null>(null);
@@ -38,6 +40,9 @@ export default function App() {
   const cameraInput = useRef<HTMLInputElement>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const importTaskRef = useRef<{ generation: number; controller: AbortController | null }>({ generation: 0, controller: null });
+
+  useEffect(() => { projectsRef.current = projects; }, [projects]);
+  useEffect(() => { sessionRef.current = session; }, [session]);
 
   const showToast = useCallback((text: string, type: 'success' | 'info' = 'success') => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
@@ -78,6 +83,31 @@ export default function App() {
     setImporting(false);
   };
 
+  const closeEditor = useCallback(() => {
+    if (session?.ownsSource) {
+      releasePreparedPhoto({
+        source: session.source,
+        previewSource: session.previewSource ?? session.source,
+        width: session.width ?? 0,
+        height: session.height ?? 0,
+      });
+    }
+    setSession(null);
+  }, [session]);
+
+  useEffect(() => () => {
+    releaseProjectUrls(projectsRef.current);
+    const activeSession = sessionRef.current;
+    if (activeSession?.ownsSource) {
+      releasePreparedPhoto({
+        source: activeSession.source,
+        previewSource: activeSession.previewSource ?? activeSession.source,
+        width: activeSession.width ?? 0,
+        height: activeSession.height ?? 0,
+      });
+    }
+  }, []);
+
   useEffect(() => {
     const importTask = importTaskRef.current;
     const frame = requestAnimationFrame(() => requestAnimationFrame(() => {
@@ -108,7 +138,7 @@ export default function App() {
       else if (infoTopic) setInfoTopic(null);
       else if (importing) cancelImport();
       else if (studio) setStudio(null);
-      else if (session) setSession(null);
+      else if (session) { /* PhotoEditor owns the dirty-close confirmation flow. */ }
       else if (view === 'settings') setView('profile');
       else if (view !== 'home') setView('home');
       else void CapacitorApp.exitApp();
@@ -146,9 +176,12 @@ export default function App() {
     input.value = '';
     if (!file) return;
     const task = beginImport();
-    void preparePhoto(file).then((source) => {
-      if (task.controller.signal.aborted || importTaskRef.current.generation !== task.id) return;
-      setSession({ source, name: file.name.replace(/\.[^.]+$/, '') || 'Yeni proje', applyAutoEnhance: auto });
+    void preparePhotoAsset(file).then((prepared) => {
+      if (task.controller.signal.aborted || importTaskRef.current.generation !== task.id) {
+        releasePreparedPhoto(prepared);
+        return;
+      }
+      setSession({ ...prepared, name: file.name.replace(/\.[^.]+$/, '') || 'Yeni proje', applyAutoEnhance: auto, ownsSource: true });
     }).catch((reason) => {
       if (!task.controller.signal.aborted && importTaskRef.current.generation === task.id) {
         showToast(reason instanceof Error ? reason.message : 'Fotoğraf içe aktarılamadı.', 'info');
@@ -192,7 +225,7 @@ export default function App() {
   };
 
   const openProject = (project: PhotoProject) => {
-    setSession({ source: project.source, name: project.name, projectId: project.id, initialSettings: project.settings });
+    setSession({ source: project.source, previewSource: project.previewSource, width: project.width, height: project.height, name: project.name, projectId: project.id, initialSettings: project.settings });
   };
 
   if (storageStatus !== 'ready') {
@@ -208,7 +241,7 @@ export default function App() {
         {view === 'profile' && <ProfileScreen projects={projects} onInfo={setInfoTopic} onSettings={() => setView('settings')} />}
         {view === 'settings' && <SettingsScreen preferences={preferences} onChange={setPreferences} onBack={() => setView('profile')} />}
       </main>}
-      {session && <PhotoEditor session={session} onClose={() => setSession(null)} onSave={saveProject} onToast={showToast} />}
+      {session && <PhotoEditor session={session} onClose={closeEditor} onSave={saveProject} onToast={showToast} />}
 
       <input ref={fileInput} className="visually-hidden" type="file" aria-label="Galeriden fotoğraf seç" accept="image/jpeg,image/png,image/webp" onChange={(event) => handleFileInput(event.target.files?.[0], event.target)} />
       <input ref={cameraInput} className="visually-hidden" type="file" aria-label="Kamera ile fotoğraf çek" accept="image/*" capture="environment" onChange={(event) => handleFileInput(event.target.files?.[0], event.target)} />

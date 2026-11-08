@@ -71,7 +71,7 @@ export function PhotoEditor({ session, onClose, onSave, onToast }: PhotoEditorPr
   const [exportOpen, setExportOpen] = useState(false);
   const [exportOptions, setExportOptions] = useState<ExportOptions>({ format: 'jpeg', quality: 0.92, maxDimension: 2048 });
   const [busy, setBusy] = useState<'save' | 'export' | 'share' | null>(null);
-  const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
+  const [imageSize, setImageSize] = useState({ width: session.width ?? 0, height: session.height ?? 0 });
   const [stageBounds, setStageBounds] = useState({ width: 0, height: 0 });
   const [adjustGroup, setAdjustGroup] = useState<'light' | 'effects'>('light');
   const [interactionTool] = useState<InteractionTool>('none');
@@ -88,17 +88,19 @@ export function PhotoEditor({ session, onClose, onSave, onToast }: PhotoEditorPr
   const pinchStart = useRef<{ distance: number; zoom: number } | null>(null);
   const stageContainerRef = useRef<HTMLDivElement>(null);
   const currentPreset = getPreset(settings.presetId);
+  const previewSource = session.previewSource ?? session.source;
   const filter = useMemo(() => buildCssFilter(settings), [settings]);
   const isQuarterTurn = settings.rotation % 180 !== 0;
   const advanced = hasAdvancedRendering(settings);
 
   useEffect(() => {
+    if (session.width && session.height) return;
     let active = true;
-    void loadImage(session.source).then((image) => {
+    void loadImage(previewSource).then((image) => {
       if (active) setImageSize({ width: image.naturalWidth, height: image.naturalHeight });
     }).catch(() => { if (active) onToast('Fotoğraf yüklenemedi.', 'info'); });
     return () => { active = false; };
-  }, [session.source, onToast]);
+  }, [previewSource, session.width, session.height, onToast]);
 
   useEffect(() => {
     const container = stageContainerRef.current;
@@ -133,7 +135,7 @@ export function PhotoEditor({ session, onClose, onSave, onToast }: PhotoEditorPr
       const cssSize = previewDimensions(stageBounds.width, stageBounds.height, imageSize.width, imageSize.height, settings);
       const backing = canvasBackingSize(cssSize.width, cssSize.height, window.devicePixelRatio || 1);
       const maxDimension = Math.max(1, backing.width, backing.height);
-      void renderPhoto(session.source, settings, { format: 'jpeg', quality: .82, maxDimension }).then(async blob => {
+      void renderPhoto(previewSource, settings, { format: 'jpeg', quality: .82, maxDimension }).then(async blob => {
         if (!active) return;
         setAdvancedPreview(URL.createObjectURL(blob));
       }).catch(() => {
@@ -141,7 +143,7 @@ export function PhotoEditor({ session, onClose, onSave, onToast }: PhotoEditorPr
       }).finally(() => { if (active) setPreviewBusy(false); });
     }, 140);
     return () => { active = false; window.clearTimeout(timer); };
-  }, [advanced, settings, session.source, imageSize.width, imageSize.height, stageBounds.width, stageBounds.height, onToast]);
+  }, [advanced, settings, previewSource, imageSize.width, imageSize.height, stageBounds.width, stageBounds.height, onToast]);
 
   useEffect(() => () => { if (advancedPreview) URL.revokeObjectURL(advancedPreview); }, [advancedPreview]);
 
@@ -203,11 +205,14 @@ export function PhotoEditor({ session, onClose, onSave, onToast }: PhotoEditorPr
   const save = async () => {
     setBusy('save');
     try {
-      const thumbnail = await createThumbnail(session.source, settings);
+      const thumbnail = await createThumbnail(previewSource, settings);
       const saved = await onSave({
         id: projectId || crypto.randomUUID(),
         name: name.trim() || 'Adsız proje',
         source: session.source,
+        previewSource,
+        width: imageSize.width,
+        height: imageSize.height,
         thumbnail,
         settings,
         createdAt: Date.now(),
@@ -320,9 +325,9 @@ export function PhotoEditor({ session, onClose, onSave, onToast }: PhotoEditorPr
           <div className="canvas-stage" ref={stageContainerRef} onPointerDown={pinchDown} onPointerMove={pinchMove} onPointerUp={pinchUp} onPointerCancel={pinchUp}>
             <div className={`photo-stage ${interactionTool !== 'none' ? 'photo-stage--interactive' : ''}`} style={{ width: preview.width || '100%', height: preview.height || '100%', aspectRatio: preview.aspectRatio, transform: `scale(${zoom})` }}>
               <div className="photo-stage__image">
-                <img src={advanced && advancedPreview ? advancedPreview : session.source} alt="Düzenlenen fotoğraf" style={advanced && advancedPreview ? advancedImageStyle : { ...previewImageStyle, filter }} draggable={false} />
+                <img src={advanced && advancedPreview ? advancedPreview : previewSource} alt="Düzenlenen fotoğraf" style={advanced && advancedPreview ? advancedImageStyle : { ...previewImageStyle, filter }} draggable={false} />
               </div>
-              {(compare || showOriginal) && <div className="before-image" style={{ clipPath: showOriginal ? 'inset(0)' : `inset(0 ${100 - comparePosition}% 0 0)` }}><img src={session.source} alt="Düzenleme öncesi" style={previewImageStyle} draggable={false} /></div>}
+              {(compare || showOriginal) && <div className="before-image" style={{ clipPath: showOriginal ? 'inset(0)' : `inset(0 ${100 - comparePosition}% 0 0)` }}><img src={previewSource} alt="Düzenleme öncesi" style={previewImageStyle} draggable={false} /></div>}
               {!advanced && settings.vignette > 0 && !showOriginal && <div className="vignette-overlay" style={{ opacity: Math.min(1, settings.vignette / 100) }} />}
               {!advanced && settings.grain > 0 && !showOriginal && <div className="grain-overlay" style={{ opacity: Math.min(0.65, settings.grain / 140) }} />}
               {settings.masks.map(mask => <div key={mask.id} className={`mask-marker mask-marker--${mask.type}`} style={{ left: `${mask.x * 100}%`, top: `${mask.y * 100}%`, width: `${mask.radius * 200}%`, aspectRatio: mask.type === 'radial' ? 1 : '1 / 5', transform: `translate(-50%,-50%) rotate(${mask.angle}deg)` }} onPointerDown={event => startLayerDrag(event, 'mask', mask.id)} onPointerMove={moveLayer} onPointerUp={endLayerDrag} onPointerCancel={endLayerDrag} />)}
@@ -332,7 +337,7 @@ export function PhotoEditor({ session, onClose, onSave, onToast }: PhotoEditorPr
               {compare && <><span className="compare-label compare-label--before">ÖNCE</span><span className="compare-label compare-label--after">SONRA</span><div className="compare-line" style={{ left: `${comparePosition}%` }}><span><Columns2 size={16} /></span></div><input className="compare-range" type="range" min="0" max="100" value={comparePosition} onChange={(event) => setComparePosition(Number(event.target.value))} aria-label="Önce ve sonra karşılaştırması" /></>}
               <span className="preset-indicator">{currentPreset.name}{settings.intensity > 0 && currentPreset.id !== 'original' ? ` · ${settings.intensity}%` : ''}</span>
               {previewBusy && <span className="advanced-preview-status"><LoaderCircle className="spin" size={12} /> Önizleme</span>}
-              {showHistogram && <PhotoHistogram source={session.source} settings={settings} />}
+              {showHistogram && <PhotoHistogram source={previewSource} settings={settings} />}
             </div>
           </div>
           <div className="canvas-footer"><span>{imageSize.width ? `${imageSize.width} × ${imageSize.height} px` : 'Fotoğraf hazırlanıyor…'}</span><div className="zoom-controls"><button onClick={() => setZoom(value => Math.max(1, value - .25))} disabled={zoom <= 1} aria-label="Uzaklaştır"><ZoomOut size={15} /></button><span>{Math.round(zoom * 100)}%</span><button onClick={() => setZoom(value => Math.min(4, value + .25))} disabled={zoom >= 4} aria-label="Yakınlaştır"><ZoomIn size={15} /></button></div><button onClick={() => { commit(freshSettings()); setAdvancedPreview(null); onToast('Tüm ayarlar sıfırlandı.', 'info'); }}><RotateCcw size={14} /> Sıfırla</button></div>
@@ -351,7 +356,7 @@ export function PhotoEditor({ session, onClose, onSave, onToast }: PhotoEditorPr
               <div className="panel-heading"><div><span className="eyebrow">İMZA KOLEKSİYONU</span><h3>Görünümünü seç</h3></div><span>{PRESETS.length} stil</span></div>
               <div className="editor-presets">
                 {PRESETS.map((preset) => <button key={preset.id} className={settings.presetId === preset.id ? 'editor-preset active' : 'editor-preset'} onClick={(event) => { selectPreset(preset.id); event.currentTarget.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' }); }}>
-                  <div><img src={session.source} alt={`${preset.name} önizlemesi`} style={{ filter: buildCssFilter({ ...freshSettings(), presetId: preset.id, intensity: 85 }) }} />{settings.presetId === preset.id && <span className="preset-check"><Check size={13} /></span>}</div><span>{preset.name}</span>
+                  <div><img src={previewSource} alt={`${preset.name} önizlemesi`} style={{ filter: buildCssFilter({ ...freshSettings(), presetId: preset.id, intensity: 85 }) }} />{settings.presetId === preset.id && <span className="preset-check"><Check size={13} /></span>}</div><span>{preset.name}</span>
                 </button>)}
               </div>
               {settings.presetId !== 'original' && <div className="intensity-control"><EditorSlider label="Görünüm yoğunluğu" value={settings.intensity} min={0} max={100} onChange={(value) => updateSlider('intensity', value)} onStart={() => { sliderStart.current = settings; }} onEnd={endSlider} onReset={() => commit({ intensity: 100 })} /></div>}
@@ -382,10 +387,10 @@ export function PhotoEditor({ session, onClose, onSave, onToast }: PhotoEditorPr
         </aside>
       </main>
 
-      {freeCropOpen && <FreeCropEditor source={session.source} initialCrop={settings.crop} onClose={() => setFreeCropOpen(false)} onApply={nextCrop => { commit({ aspectRatio: 'free', crop: nextCrop }); setFreeCropOpen(false); }} />}
+      {freeCropOpen && <FreeCropEditor source={previewSource} initialCrop={settings.crop} onClose={() => setFreeCropOpen(false)} onApply={nextCrop => { commit({ aspectRatio: 'free', crop: nextCrop }); setFreeCropOpen(false); }} />}
       {busy === 'share' && <div className="editor-share-status glass-modal" role="status"><MyVisionLogo variant="wordmark" size={34} /><LoaderCircle className="spin" size={22} /><strong>Görüşün paylaşıma hazırlanıyor</strong></div>}
       {exportOpen && <Modal title="Fotoğrafını dışa aktar" onClose={() => busy === null && setExportOpen(false)} className="export-modal">
-        <div className="export-preview"><img src={session.source} alt="Dışa aktarılacak fotoğraf" style={{ filter }} /><span><Check size={15} /> Düzenlemeler uygulandı</span></div>
+        <div className="export-preview"><img src={advancedPreview ?? previewSource} alt="Dışa aktarılacak fotoğraf" style={{ filter }} /><span><Check size={15} /> Düzenlemeler uygulandı</span></div>
         <div className="export-field"><label>Dosya formatı</label><div className="format-options"><button className={exportOptions.format === 'jpeg' ? 'active' : ''} onClick={() => setExportOptions({ ...exportOptions, format: 'jpeg' })}><strong>JPG</strong><small>Paylaşım için ideal</small></button><button className={exportOptions.format === 'png' ? 'active' : ''} onClick={() => setExportOptions({ ...exportOptions, format: 'png' })}><strong>PNG</strong><small>Kayıpsız kalite</small></button></div></div>
         <div className="export-field"><label>Çıktı boyutu</label><div className="size-options">{[1080, 2048, 4096].map((size) => <button key={size} className={exportOptions.maxDimension === size ? 'active' : ''} onClick={() => setExportOptions({ ...exportOptions, maxDimension: size })}><strong>{size === 4096 ? '4K' : `${size} px`}</strong><small>{size === 1080 ? 'Sosyal medya' : size === 2048 ? 'Yüksek kalite' : 'Maksimum'}</small></button>)}</div></div>
         {exportOptions.format === 'jpeg' && <EditorSlider label="Görüntü kalitesi" value={Math.round(exportOptions.quality * 100)} min={60} max={100} displayValue={`${Math.round(exportOptions.quality * 100)}%`} onChange={(value) => setExportOptions({ ...exportOptions, quality: value / 100 })} />}

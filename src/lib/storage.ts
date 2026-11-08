@@ -8,8 +8,9 @@ const DATABASE_NAME = 'myvision-studio';
 const DATABASE_VERSION = 1;
 const PROJECT_STORE = 'projects';
 
-interface StoredPhotoProject extends Omit<PhotoProject, 'source' | 'thumbnail'> {
+interface StoredPhotoProject extends Omit<PhotoProject, 'source' | 'previewSource' | 'thumbnail'> {
   source: Blob;
+  preview?: Blob;
   thumbnail?: Blob;
 }
 interface StudioDatabase extends DBSchema {
@@ -46,16 +47,20 @@ async function sourceToBlob(source: string): Promise<Blob> {
 
 async function toStoredProject(project: PhotoProject): Promise<StoredPhotoProject> {
   if (!project.id || !project.name || !project.settings) throw new Error('Proje kaydı eksik.');
+  const { previewSource, ...metadata } = project;
   const source = await sourceToBlob(project.source);
+  const preview = previewSource && previewSource !== project.source ? await sourceToBlob(previewSource) : undefined;
   const thumbnail = project.thumbnail ? await sourceToBlob(project.thumbnail) : undefined;
-  return { ...project, settings: freshSettings(project.settings), source, thumbnail, isSample: false };
+  return { ...metadata, settings: freshSettings(project.settings), source, preview, thumbnail, isSample: false };
 }
 
 async function fromStoredProject(project: StoredPhotoProject): Promise<PhotoProject> {
+  const { preview, ...metadata } = project;
   return {
-    ...project,
+    ...metadata,
     settings: freshSettings(project.settings),
     source: URL.createObjectURL(project.source),
+    previewSource: preview ? URL.createObjectURL(preview) : undefined,
     thumbnail: project.thumbnail ? URL.createObjectURL(project.thumbnail) : undefined,
   };
 }
@@ -134,14 +139,16 @@ export async function saveStoredProject(project: PhotoProject): Promise<PhotoPro
   const db = await database();
   await db.put(PROJECT_STORE, stored);
   await verifyStoredProject(stored);
-  return { ...project, settings: stored.settings };
+  return fromStoredProject(stored);
 }
 
 export async function updateStoredProject(id: string, patch: Partial<PhotoProject>): Promise<void> {
   const db = await database();
   const current = await db.get(PROJECT_STORE, id);
   if (!current) throw new Error('Proje bulunamadı.');
-  const updated = { ...current, ...patch, id, source: current.source, thumbnail: current.thumbnail };
+  const metadata = { ...patch };
+  delete metadata.source; delete metadata.previewSource; delete metadata.thumbnail;
+  const updated: StoredPhotoProject = { ...current, ...metadata, id, source: current.source, preview: current.preview, thumbnail: current.thumbnail };
   await db.put(PROJECT_STORE, updated);
   await verifyStoredProject(updated);
 }
@@ -155,6 +162,7 @@ export async function deleteStoredProject(id: string): Promise<void> {
 export function releaseProjectUrls(projects: PhotoProject[]) {
   for (const project of projects) {
     if (project.source.startsWith('blob:')) URL.revokeObjectURL(project.source);
+    if (project.previewSource && project.previewSource !== project.source && project.previewSource.startsWith('blob:')) URL.revokeObjectURL(project.previewSource);
     if (project.thumbnail?.startsWith('blob:')) URL.revokeObjectURL(project.thumbnail);
   }
 }

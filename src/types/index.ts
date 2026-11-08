@@ -32,8 +32,12 @@ export interface EditSettings {
 }
 
 export interface PhotoProject {
-  id: string; name: string; source: string; thumbnail?: string; settings: EditSettings;
+  id: string; name: string; source: string; previewSource?: string; thumbnail?: string; settings: EditSettings;
+  width?: number; height?: number;
   createdAt: number; updatedAt: number; isSample?: boolean; favorite?: boolean; album?: string; tags?: string[];
 }
-export interface ExportOptions { format: ExportFormat; quality: number; maxDimension: number; }
-export interface EditorSession { source: string; name: string; projectId?: string; initialSettings?: EditSettings; applyAutoEnhance?: boolean; }
+export interface ExportOptions { format: ExportFormat; quality: number; maxDimension: number; signal?: AbortSignal; }
+export interface EditorSession {
+  source: string; previewSource?: string; width?: number; height?: number; name: string;
+  projectId?: string; initialSettings?: EditSettings; applyAutoEnhance?: boolean; ownsSource?: boolean;
+}

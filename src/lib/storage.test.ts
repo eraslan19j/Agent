@@ -96,10 +96,16 @@ describe('IndexedDB project storage', () => {
   it('saves, verifies and deletes a project', async () => {
     const store = await moduleUnderTest();
     await store.initializeStorage();
-    const saved = await store.saveStoredProject(project({ name: 'Yeni çalışma' }));
+    const saved = await store.saveStoredProject(project({ name: 'Yeni çalışma', previewSource: PIXEL.replace('iVBOR', 'iVBPS'), width: 8000, height: 4000 }));
     expect(saved.name).toBe('Yeni çalışma');
+    expect(saved.previewSource).toMatch(/^blob:/);
+    expect(saved.width).toBe(8000);
     const db = await openDB('myvision-studio', 1);
-    expect(await db.get('projects', saved.id)).toBeDefined();
+    const persisted = await db.get('projects', saved.id);
+    expect(persisted).toBeDefined();
+    expect(persisted.preview).toBeInstanceOf(Blob);
+    expect(persisted.previewSource).toBeUndefined();
+    expect(persisted.height).toBe(4000);
     await store.deleteStoredProject(saved.id);
     expect(await db.get('projects', saved.id)).toBeUndefined();
   });
