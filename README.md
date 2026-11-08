@@ -1,6 +1,6 @@
-# My Vision — Yerel Fotoğraf Stüdyosu
+# My Vision — Fotoğraf ve Video Stüdyosu
 
-My Vision; görünümler, hassas fotoğraf ayarları, kadraj, düzenlenebilir metin, kolaj ve toplu işlem araçlarını birleştiren ücretsiz, mobil öncelikli bir fotoğraf uygulamasıdır. React + TypeScript arayüzü Capacitor ile Android uygulamasına paketlenir. Fotoğraflar ve projeler cihazda işlenir; hesap, ödeme veya bulut servisi gerekmez.
+My Vision; görünümler, hassas fotoğraf ayarları, kadraj, düzenlenebilir metin, çok klipli video, kolaj ve toplu işlem araçlarını birleştiren ücretsiz, mobil öncelikli bir uygulamadır. React + TypeScript arayüzü Capacitor ile Android uygulamasına paketlenir. Özel projeler cihazda kalır; yalnız kullanıcının açıkça “Paylaşım alanına yükle” dediği fotoğraflar Node sunucusuna gönderilir.
 
 ## Özellikler
 
@@ -10,10 +10,12 @@ My Vision; görünümler, hassas fotoğraf ayarları, kadraj, düzenlenebilir me
 - **Çalışma geçmişi:** Geri al, yinele, önce/sonra ve sıfırlama
 - **Yerel projeler:** IndexedDB içinde ayrı medya Blob’ları ve proje metadata’sı; arama, filtreleme, favori, albüm ve etiketler
 - **Güvenli eski veri aktarımı:** localStorage kaydı IndexedDB’ye yazılıp tekrar okunarak doğrulanmadan eski kayıt silinmez
+- **Video editörü:** 8 klip/120 saniye, trim, hız, bölme, sıralama, fade, metin/sticker, kullanıcı müziği ve 720p/1080p MP4
 - **Stüdyo:** Gerçek çok fotoğraflı kolaj ve ortak ayarlarla toplu dışa aktarma
+- **Paylaşım alanı:** Galeri/kamera upload’ı, müşteri fotoğrafını seçip efektle düzenleme, düzenlenmiş kopyayı yayınlama ve `/share/:id` bağlantıları
 - **Dışa aktarma:** JPG/PNG, kalite ve 1080/2048/4096 px seçenekleri; Android’de Documents/My Vision
 - **Sade sistem tasarımı:** Sistem fontu, nötr zeminler, mavi vurgu, açık/koyu/sistem teması, en az 44 px dokunma hedefleri
-- **Gizlilik:** Cihaz içi işleme, reklam takipçisi yok, zorunlu ağ servisi yok
+- **Gizlilik:** Özel projeler cihaz içi işlenir; reklam takipçisi yok. Paylaşım alanına yüklenen fotoğraflar sunucuda herkese açık galeri olarak saklanır.
 
 ## Hızlı başlangıç
 
@@ -21,8 +23,18 @@ Node.js 22 önerilir.
 
 ```bash
 npm ci
-npm run dev
+npm run dev:server  # Terminal 1 — API ve paylaşım sunucusu, :8787
+npm run dev         # Terminal 2 — Vite, /api isteklerini :8787'e proxy'ler
 ```
+
+Production’da tek Node süreci hem derlenmiş uygulamayı hem API’yi sunar:
+
+```bash
+npm run build
+npm start           # PORT=8787; 0.0.0.0 üzerinde dinler
+```
+
+Upload’lar `.data/shared-photos/` altında, metadata `.data/shared-photos.json` içinde atomik olarak saklanır. `.data` Git’e eklenmez. Kalıcı üretim diski için `MY_VISION_DATA_DIR`, native istemci için `VITE_API_URL` / `VITE_PUBLIC_URL` ve `CLIENT_ORIGIN` kullanılabilir; örnek `.env.example` içindedir.
 
 ### Kontroller
 
@@ -31,9 +43,11 @@ npm run test         # Birim ve migrasyon testleri
 npm run lint         # ESLint
 npm run build        # FFmpeg varlıkları + TypeScript + production build + boyut/hash kontrolü
 npm run test:ffmpeg  # Gerçek Chromium Worker, WebM→MP4 ve playback testi
+npm run test:server  # Gerçek HTTP upload, imza doğrulama, byte eşitliği ve restart kalıcılığı
+npm audit --omit=dev # Production bağımlılık güvenlik taraması
 ```
 
-FFmpeg yalnızca gelecekteki video işlem hattının teknik doğrulamasıdır; bu sürümde video editörü arayüzü yoktur. Tek iş parçacıklı çekirdek Brotli ile yaklaşık 6,94 MiB’a indirilir. Statik sunucu `.wasm.br` dosyasını `Content-Encoding: br` ve `Content-Type: application/wasm` başlıklarıyla sunmalıdır; örnek kurallar `public/_headers` içindedir.
+FFmpeg, video editörünün gerçek H.264/AAC MP4 üretimini Worker içinde cihazda yapar; videolar sunucuya gönderilmez. Tek iş parçacıklı çekirdek Brotli ile yaklaşık 6,94 MiB’a indirilir. Statik sunucu `.wasm.br` dosyasını `Content-Encoding: br` ve `Content-Type: application/wasm` başlıklarıyla sunmalıdır; örnek kurallar `public/_headers` içindedir.
 
 ## Android
 
@@ -58,6 +72,8 @@ src/
   lib/              Görüntü motoru, IndexedDB, indirme ve teknik video doğrulaması
   types/            Ortak TypeScript tipleri
 android/            Native Capacitor Android projesi
+server/             Express API, güvenli upload ve HTTP entegrasyon doğrulaması
+.data/              Çalışma zamanı paylaşım dosyaları ve metadata (Git dışı)
 public/
   ffmpeg/           Sıkıştırılmış çekirdek, manifest ve lisanslar
   privacy*.html     Gizlilik politikaları

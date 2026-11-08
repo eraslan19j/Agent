@@ -1,4 +1,4 @@
-export type AppView = 'home' | 'projects' | 'profile' | 'settings';
+export type AppView = 'home' | 'shared' | 'projects' | 'profile' | 'settings';
 export type EditorTab = 'looks' | 'adjust' | 'crop' | 'color' | 'text';
 export type AspectRatio = 'original' | 'free' | '1:1' | '4:5' | '3:4' | '16:9' | '9:16' | '2:3';
 export type ExportFormat = 'jpeg' | 'png';

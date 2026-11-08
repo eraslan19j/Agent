@@ -5,7 +5,7 @@ import { MyVisionLogo } from './MyVisionLogo';
 const steps = [
   { icon: ImagePlus, eyebrow: 'KENDİ FOTOĞRAFIN', title: 'Bir fotoğrafla başla.', text: 'Galerinden seç veya yeni bir fotoğraf çek. Arşivinde yalnızca kendi kaydettiğin projeler görünür.' },
   { icon: SlidersHorizontal, eyebrow: 'CİHAZ İÇİ STÜDYO', title: 'Her ayar sende.', text: 'Kırp, renklendir, metin ekle ve kolaj oluştur. Geri al/yinele ve önce–sonra ile kontrolü kaybetme.' },
-  { icon: ShieldCheck, eyebrow: 'GİZLİLİK ÖNCE', title: 'Fotoğraflar cihazında.', text: 'Düzenleme cihazında çalışır. Projeler IndexedDB içinde tutulur ve herhangi bir sunucuya gönderilmez.' },
+  { icon: ShieldCheck, eyebrow: 'GİZLİLİK ÖNCE', title: 'Fotoğraflar cihazında.', text: 'Düzenleme cihazında çalışır. Özel projeler IndexedDB içinde kalır; yalnız paylaşım alanına yüklediklerin sunucuya gönderilir.' },
 ];
 export function Onboarding({ onComplete }: { onComplete: () => void }) {
   const [index, setIndex] = useState(0); const step = steps[index]; const Icon = step.icon;

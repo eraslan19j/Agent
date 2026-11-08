@@ -3,6 +3,7 @@ node_modules/
 dist/
 .vite/
 coverage/
+.data/
 *.local
 .env
 .env.*

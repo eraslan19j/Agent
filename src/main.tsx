@@ -6,6 +6,7 @@ import './preferences.css';
 import './editor-advanced.css';
 import './studio.css';
 import './video.css';
+import './shared.css';
 import App from './App';
 import { applyPreferences, loadPreferences } from './lib/preferences';
 import { startLocalization } from './lib/localization';

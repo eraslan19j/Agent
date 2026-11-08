@@ -1,0 +1,37 @@
+.export-modal .export-confirm + .export-confirm { margin-top: 8px; }
+.shared-screen { width: min(1180px,100%); margin: 0 auto; }
+.shared-hero { min-height: 250px; padding: clamp(28px,5vw,58px); display: flex; align-items: center; justify-content: space-between; gap: 24px; overflow: hidden; border: 1px solid var(--line); border-radius: 24px; background: radial-gradient(circle at 86% 18%,color-mix(in srgb,var(--accent) 25%,transparent),transparent 42%),var(--surface); }
+.shared-hero h1 { margin: 10px 0 14px; font-size: clamp(38px,6vw,66px); line-height: .98; letter-spacing: -.05em; }
+.shared-hero p { max-width: 580px; color: var(--muted); line-height: 1.6; }
+.shared-hero__icon { width: 90px; height: 90px; flex: 0 0 auto; display: grid; place-items: center; border: 1px solid color-mix(in srgb,var(--accent) 38%,var(--line)); border-radius: 28px; background: var(--accent-soft); color: var(--accent); transform: rotate(4deg); }
+.shared-upload { margin: 24px 0 30px; padding: 22px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); }
+.shared-upload .section-heading { margin-bottom: 8px; }
+.shared-upload .section-heading h2 { font-size: 22px; }
+.shared-upload > input { width: 100%; min-height: 46px; margin: 16px 0 12px; padding: 0 13px; border: 1px solid var(--line); border-radius: 10px; background: var(--field-bg); color: var(--text); }
+.shared-upload__actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.shared-upload__actions .icon-button { margin-left: auto; }
+.shared-status { min-height: 240px; padding: 30px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: var(--muted); text-align: center; }
+.shared-status h2 { color: var(--text); }
+.shared-status p { max-width: 440px; line-height: 1.55; }
+.shared-gallery { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 18px; }
+.shared-card { min-width: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); }
+.shared-card.is-shared { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.shared-card__image { aspect-ratio: 16 / 10; overflow: hidden; background: var(--field-bg); }
+.shared-card__image img { width: 100%; height: 100%; display: block; object-fit: contain; }
+.shared-card__body { padding: 16px; }
+.shared-card__body strong, .shared-card__body small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shared-card__body small { margin-top: 5px; color: var(--muted); }
+.shared-card__body > p { margin: 12px 0 0; color: var(--muted); line-height: 1.45; overflow-wrap: anywhere; }
+.shared-card__actions { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 8px; }
+.shared-card__actions .button { flex: 1; min-width: 120px; }
+@media (max-width: 760px) {
+  .shared-hero { min-height: 220px; padding: 26px 22px; border-radius: 18px; }
+  .shared-hero__icon { width: 64px; height: 64px; border-radius: 20px; }
+  .shared-gallery { grid-template-columns: 1fr; }
+  .shared-upload { padding: 18px; }
+}
+@media (max-width: 420px) {
+  .shared-hero__icon { display: none; }
+  .shared-upload__actions .button { flex: 1; padding: 0 10px; font-size: 12px; }
+  .shared-upload__actions .icon-button { margin-left: 0; }
+}

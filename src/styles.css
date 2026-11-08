@@ -368,7 +368,7 @@ input, select, textarea { color: var(--text); }
 @media (max-width: 760px) {
   .app-content { margin-left: 0; padding-bottom: calc(76px + var(--safe-area-bottom)); }
   .sidebar { display: none; }
-  .bottom-nav { position: fixed; z-index: 40; inset: auto 0 0; height: calc(68px + var(--safe-area-bottom)); padding: 4px 8px var(--safe-area-bottom); display: grid; grid-template-columns: repeat(4,1fr); border-top: 1px solid var(--line); background: var(--surface); }
+  .bottom-nav { position: fixed; z-index: 40; inset: auto 0 0; height: calc(68px + var(--safe-area-bottom)); padding: 4px 8px var(--safe-area-bottom); display: grid; grid-template-columns: repeat(5,1fr); border-top: 1px solid var(--line); background: var(--surface); }
   .bottom-nav > button { min-height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; background: transparent; color: var(--muted); font-size: 11px; }
   .bottom-nav > button.active { color: var(--accent); }
   .bottom-nav__create { color: var(--accent) !important; }

@@ -1,4 +1,4 @@
-import { ArrowRight, Camera, Film, Folder, ImagePlus, LayoutGrid, ListChecks, ShieldCheck, WandSparkles } from 'lucide-react';
+import { ArrowRight, Camera, Film, Folder, ImagePlus, LayoutGrid, ListChecks, Share2, ShieldCheck, WandSparkles } from 'lucide-react';
 import type { PhotoProject } from '../types';
 import { Brand } from './Brand';
 
@@ -12,9 +12,10 @@ interface HomeScreenProps {
   onCollage: () => void;
   onBatch: () => void;
   onVideo: () => void;
+  onShared: () => void;
 }
 
-export function HomeScreen({ projects, onOpen, onCreate, onCamera, onAuto, onProjects, onCollage, onBatch, onVideo }: HomeScreenProps) {
+export function HomeScreen({ projects, onOpen, onCreate, onCamera, onAuto, onProjects, onCollage, onBatch, onVideo, onShared }: HomeScreenProps) {
   return (
     <div className="screen home-screen page-enter">
       <header className="home-header"><Brand /></header>
@@ -33,6 +34,7 @@ export function HomeScreen({ projects, onOpen, onCreate, onCamera, onAuto, onPro
         <div className="quick-grid">
           <button className="quick-card" onClick={onAuto}><WandSparkles size={22} /><span><strong>Otomatik iyileştir</strong><small>Dengeli ışık ve renkle başla</small></span><ArrowRight size={17} /></button>
           <button className="quick-card" onClick={onVideo}><Film size={22} /><span><strong>Video düzenle</strong><small>Klip, efekt, metin ve MP4</small></span><ArrowRight size={17} /></button>
+          <button className="quick-card" onClick={onShared}><Share2 size={22} /><span><strong>Paylaşım alanı</strong><small>Fotoğraf yükle, seç ve düzenle</small></span><ArrowRight size={17} /></button>
           <button className="quick-card" onClick={onCollage}><LayoutGrid size={22} /><span><strong>Kolaj oluştur</strong><small>2–6 fotoğrafı bir araya getir</small></span><ArrowRight size={17} /></button>
           <button className="quick-card" onClick={onBatch}><ListChecks size={22} /><span><strong>Toplu işlem</strong><small>Aynı ayarı 12 fotoğrafa uygula</small></span><ArrowRight size={17} /></button>
         </div>

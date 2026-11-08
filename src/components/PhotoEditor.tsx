@@ -4,7 +4,7 @@ import {
   FlipHorizontal2, FlipVertical2, Grid3X3, Image as ImageIcon, LoaderCircle,
   Redo2, RotateCcw, RotateCw, Save, Share2, SlidersHorizontal,
   Sparkles, Sun, Thermometer, Undo2, WandSparkles, Waves, Palette, Type,
-  ZoomIn, ZoomOut, Copy, Clipboard, Plus, Trash2, BarChart3, PanelBottomClose, PanelBottomOpen,
+  ZoomIn, ZoomOut, Copy, Clipboard, Plus, Trash2, BarChart3, PanelBottomClose, PanelBottomOpen, Upload,
 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -27,6 +27,7 @@ interface PhotoEditorProps {
   session: EditorSession;
   onClose: () => void;
   onSave: (project: PhotoProject) => Promise<PhotoProject>;
+  onPublish: (blob: Blob, name: string) => Promise<void>;
   onToast: (message: string, type?: 'success' | 'info') => void;
 }
 
@@ -59,7 +60,7 @@ const effects = [
   { key: 'grain' as const, label: 'Film greni', min: 0, max: 100, icon: Grid3X3 },
 ];
 
-export function PhotoEditor({ session, onClose, onSave, onToast }: PhotoEditorProps) {
+export function PhotoEditor({ session, onClose, onSave, onPublish, onToast }: PhotoEditorProps) {
   const [settings, setSettings] = useState<EditSettings>(() => freshSettings({ ...session.initialSettings, ...(session.applyAutoEnhance ? AUTO_ENHANCE_SETTINGS : {}) }));
   const [history, setHistory] = useState<EditSettings[]>([]);
   const [future, setFuture] = useState<EditSettings[]>([]);
@@ -79,7 +80,7 @@ export function PhotoEditor({ session, onClose, onSave, onToast }: PhotoEditorPr
   const [originalHintUses, setOriginalHintUses] = useState(() => Number(localStorage.getItem('myvision.original-hints.v1') || 0));
   const [tooltip, setTooltip] = useState<{ text: string; x: number; y: number } | null>(null);
   const [exportOptions, setExportOptions] = useState<ExportOptions>({ format: 'jpeg', quality: 0.92, maxDimension: 2048 });
-  const [busy, setBusy] = useState<'save' | 'export' | 'share' | null>(null);
+  const [busy, setBusy] = useState<'save' | 'export' | 'share' | 'publish' | null>(null);
   const [imageSize, setImageSize] = useState({ width: session.width ?? 0, height: session.height ?? 0 });
   const [stageBounds, setStageBounds] = useState({ width: 0, height: 0 });
   const [adjustGroup, setAdjustGroup] = useState<'light' | 'effects'>('light');
@@ -313,6 +314,16 @@ export function PhotoEditor({ session, onClose, onSave, onToast }: PhotoEditorPr
     } finally { setBusy(null); }
   };
 
+  const publish = async () => {
+    setBusy('publish');
+    try {
+      const blob = await renderPhoto(session.source, settings, exportOptions);
+      await onPublish(blob, name.trim() || 'my-vision');
+      setExportOpen(false); setExportPreview(null);
+    } catch (reason) { onToast(reason instanceof Error ? reason.message : 'Fotoğraf paylaşım alanına yüklenemedi.', 'info'); }
+    finally { setBusy(null); }
+  };
+
   const share = async () => {
     setBusy('share');
     try {
@@ -517,6 +528,7 @@ export function PhotoEditor({ session, onClose, onSave, onToast }: PhotoEditorPr
         <div className="export-field"><label>Çıktı boyutu</label><div className="size-options">{[1080, 2048, 4096].map((size) => <button key={size} className={exportOptions.maxDimension === size ? 'active' : ''} onClick={() => setExportOptions({ ...exportOptions, maxDimension: size })}><strong>{size === 4096 ? '4K' : `${size} px`}</strong><small>{size === 1080 ? 'Sosyal medya' : size === 2048 ? 'Yüksek kalite' : 'Maksimum'}</small></button>)}</div></div>
         {exportOptions.format === 'jpeg' && <EditorSlider label="Görüntü kalitesi" value={Math.round(exportOptions.quality * 100)} min={60} max={100} displayValue={`${Math.round(exportOptions.quality * 100)}%`} onChange={(value) => setExportOptions({ ...exportOptions, quality: value / 100 })} />}
         <div className="export-summary"><span>Tahmini çıktı</span><strong>{output ? `${output.width} × ${output.height} px` : 'Hesaplanıyor…'}</strong></div>
+        <button className="button button--outline export-confirm" onClick={() => void publish()} disabled={busy !== null || !exportPreview}>{busy === 'publish' ? <LoaderCircle className="spin" size={19} /> : <Upload size={19} />}{busy === 'publish' ? 'Paylaşım alanına yükleniyor…' : 'Paylaşım alanına yükle'}</button>
         <button className="button button--lime export-confirm" onClick={() => void exportPhoto()} disabled={busy !== null}>{busy === 'export' ? <LoaderCircle className="spin" size={19} /> : <Download size={19} />}{busy === 'export' ? 'Fotoğraf işleniyor…' : 'Fotoğrafı indir'}</button>
         <p className="export-note">Orijinal fotoğrafın değiştirilmez. Yeni bir kopya oluşturulur.</p>
       </Modal>}

@@ -6,6 +6,7 @@ import { SplashScreen } from '@capacitor/splash-screen';
 import { Navigation } from './components/Navigation';
 import { HomeScreen } from './components/HomeScreen';
 import { ProjectsScreen } from './components/ProjectsScreen';
+import { SharedPhotosScreen } from './components/SharedPhotosScreen';
 import { ProfileScreen } from './components/ProfileScreen';
 import type { InfoTopic } from './components/ProfileScreen';
 import SettingsScreen from './components/SettingsScreen';
@@ -21,11 +22,12 @@ import type { ToastMessage } from './components/Toast';
 import { preparePhotoAsset, releasePreparedPhoto } from './lib/imageEngine';
 import { applyPreferences, loadPreferences, persistPreferences, watchSystemTheme, type AppPreferences } from './lib/preferences';
 import { setLocalizationLanguage } from './lib/localization';
+import { uploadSharedPhoto } from './lib/sharedPhotos';
 import { deleteStoredProject, hasOnboarded, initializeStorage, releaseProjectUrls, saveStoredProject, setOnboarded, updateStoredProject } from './lib/storage';
 import type { AppView, EditorSession, PhotoProject } from './types';
 
 export default function App() {
-  const [view, setView] = useState<AppView>('home');
+  const [view, setView] = useState<AppView>(() => window.location.pathname.startsWith('/share/') ? 'shared' : 'home');
   const [projects, setProjects] = useState<PhotoProject[]>([]);
   const projectsRef = useRef<PhotoProject[]>([]);
   const sessionRef = useRef<EditorSession | null>(null);
@@ -173,11 +175,7 @@ export default function App() {
     input.click();
   };
 
-  const handleFileInput = (file: File | undefined, input: HTMLInputElement) => {
-    const auto = input.dataset.auto === 'true';
-    input.dataset.auto = 'false';
-    input.value = '';
-    if (!file) return;
+  const importPhoto = (file: File, auto = false) => {
     const task = beginImport();
     void preparePhotoAsset(file).then((prepared) => {
       if (task.controller.signal.aborted || importTaskRef.current.generation !== task.id) {
@@ -190,6 +188,18 @@ export default function App() {
         showToast(reason instanceof Error ? reason.message : 'Fotoğraf içe aktarılamadı.', 'info');
       }
     }).finally(() => finishImport(task));
+  };
+
+  const handleFileInput = (file: File | undefined, input: HTMLInputElement) => {
+    const auto = input.dataset.auto === 'true';
+    input.dataset.auto = 'false'; input.value = '';
+    if (file) importPhoto(file, auto);
+  };
+
+  const publishPhoto = async (blob: Blob, name: string) => {
+    const extension = blob.type === 'image/png' ? 'png' : 'jpg';
+    await uploadSharedPhoto(new File([blob], `${name.slice(0, 60)}.${extension}`, { type: blob.type }), 'My Vision ile düzenlendi');
+    setView('shared'); showToast('Düzenlenen fotoğraf paylaşım alanına yüklendi.');
   };
 
   const saveProject = async (draft: PhotoProject) => {
@@ -237,14 +247,15 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      {!session && view !== 'settings' && <Navigation view={view} onNavigate={setView} onCreate={openPicker} />}
-      {!session && <main className={`app-content ${view === 'settings' ? 'app-content--settings' : ''}`}>
-        {view === 'home' && <HomeScreen projects={projects} onOpen={openProject} onCreate={openPicker} onCamera={openCamera} onAuto={openAutoEnhance} onProjects={() => setView('projects')} onCollage={() => setStudio('collage')} onBatch={() => setStudio('batch')} onVideo={() => setVideoOpen(true)} />}
+      {!session && !videoOpen && !studio && view !== 'settings' && <Navigation view={view} onNavigate={setView} onCreate={openPicker} />}
+      {!session && !videoOpen && !studio && <main className={`app-content ${view === 'settings' ? 'app-content--settings' : ''}`}>
+        {view === 'home' && <HomeScreen projects={projects} onOpen={openProject} onCreate={openPicker} onCamera={openCamera} onAuto={openAutoEnhance} onProjects={() => setView('projects')} onCollage={() => setStudio('collage')} onBatch={() => setStudio('batch')} onVideo={() => setVideoOpen(true)} onShared={() => setView('shared')} />}
+        {view === 'shared' && <SharedPhotosScreen onEdit={file => importPhoto(file)} onToast={showToast} />}
         {view === 'projects' && <ProjectsScreen projects={projects} onOpen={openProject} onCreate={openPicker} onDelete={deleteProject} onUpdate={updateProject} />}
         {view === 'profile' && <ProfileScreen projects={projects} onInfo={setInfoTopic} onSettings={() => setView('settings')} />}
         {view === 'settings' && <SettingsScreen preferences={preferences} onChange={setPreferences} onBack={() => setView('profile')} />}
       </main>}
-      {session && <PhotoEditor session={session} onClose={closeEditor} onSave={saveProject} onToast={showToast} />}
+      {session && <PhotoEditor session={session} onClose={closeEditor} onSave={saveProject} onPublish={publishPhoto} onToast={showToast} />}
       {videoOpen && <VideoEditor onClose={() => setVideoOpen(false)} onToast={showToast} />}
 
       <input ref={fileInput} className="visually-hidden" type="file" aria-label="Galeriden fotoğraf seç" accept="image/jpeg,image/png,image/webp" onChange={(event) => handleFileInput(event.target.files?.[0], event.target)} />

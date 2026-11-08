@@ -1,4 +1,4 @@
-import { Folder, Home, Plus, UserRound } from 'lucide-react';
+import { Folder, Home, Plus, Share2, UserRound } from 'lucide-react';
 import type { AppView } from '../types';
 import { Brand } from './Brand';
 
@@ -10,6 +10,7 @@ interface NavigationProps {
 
 const items = [
   { id: 'home' as const, label: 'Ana sayfa', icon: Home },
+  { id: 'shared' as const, label: 'Paylaşım', icon: Share2 },
   { id: 'projects' as const, label: 'Projeler', icon: Folder },
   { id: 'profile' as const, label: 'Profil', icon: UserRound },
 ];
@@ -27,7 +28,7 @@ export function Navigation({ view, onNavigate, onCreate }: NavigationProps) {
             </button>
           ))}
         </nav>
-        <div className="sidebar__footer"><div><strong>Yerel stüdyo</strong><span>Fotoğraflar bu cihazda saklanır</span></div></div>
+        <div className="sidebar__footer"><div><strong>Yerel + paylaşım</strong><span>Özel projeler bu cihazda kalır</span></div></div>
       </aside>
       <nav className="bottom-nav" aria-label="Ana navigasyon">
         {items.map(({ id, label, icon: Icon }) => (
