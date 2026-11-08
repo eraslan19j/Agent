@@ -3,6 +3,15 @@
 Tarih: 2026-11-08 (UTC)  
 Kapsam: Web/Chromium ve Android WebView'a aktarılan kullanıcı arayüzü; fiziksel cihaz performansı bu raporun dışındadır.
 
+## Güncel Android paketi
+
+- Kod: `65b0266` (`feat: add multi-clip video editor`)
+- CI: https://github.com/eraslan19j/Agent/actions/runs/42488306321 — **SUCCESS**
+- APK: https://github.com/eraslan19j/Agent/releases/download/my-vision-v1.4.0-debug/My-Vision-1.4.0-debug.apk
+- Boyut: **13.751.111 byte**
+- SHA-256: **`491772d30bf719aad9173b0c3ce2c01cd3a5f4c7b499b7643a53138062077d52`**
+- Debug imzalı, minimum Android 7.0; target Android 16 / API 36 ve 16 KB zipalign CI'da doğrulandı.
+
 ## Uygulanan kullanıcı akışı
 
 - Ana sayfadan açılan ayrı video stüdyosu; en fazla 8 klip ve toplam 120 saniye.
