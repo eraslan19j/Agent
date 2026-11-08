@@ -54,12 +54,14 @@ Ekran kanıtları çalışma alanında:
 - `npm run lint`: PASS.
 - `npm run build`: strict TypeScript, Vite production build ve yerel FFmpeg asset doğrulaması PASS.
 - `git diff --check`: PASS.
+- Android CI [42479175419](https://github.com/eraslan19j/Agent/actions/runs/42479175419): **SUCCESS**; web doğrulaması, Capacitor sync, debug APK, target API 36 ve 16 KB zipalign PASS.
+- Güncel kurulabilir APK: [My-Vision-1.4.0-debug.apk](https://github.com/eraslan19j/Agent/releases/download/my-vision-v1.4.0-debug/My-Vision-1.4.0-debug.apk), **13.723.722 byte**, debug imzalı, minimum Android 7.0. CI üzerinden yayınlanan SHA-256: **`2dbaa222c85e06bcde684073b0a952262590e7d3ce205ef84cee7515b7d12986`**. Yerel indirme/kurulum yapılmadı.
 
 Ağ denetimi: Aşama 1 diff’inde yeni uzak URL, analytics/tracker, XMLHttpRequest veya sendBeacon yok. Eklenen `fetch(prepared.previewSource)` yalnız uygulamanın ürettiği yerel Blob/ObjectURL verisini thumbnail için okur; sunucuya fotoğraf göndermez.
 
 ## Fiziksel Android elle test listesi — henüz çalıştırılmadı
 
-Bu maddeler güncel kodu içeren yeni bir APK ile yapılmalıdır. Mevcut `my-vision-v1.4.0-debug` release’i bu son değişiklikleri içermez.
+Bu maddeler yukarıdaki CI 42479175419 artifact’ı ile yapılmalıdır. Release aynı tag üzerinde güncellendiği için kurulumdan önce dosya boyutu ve SHA-256 eşleşmesi kontrol edilmelidir; daha eski 13.720.070 byte’lık APK bu son değişiklikleri içermez.
 
 1. **Kurulum ve migrasyon:** v1.4.0 üstüne güncelle; eski projeleri, metinleri, EXIF yönünü ve orijinal kaynakları aç. Uçak modunda tekrarla.
 2. **12 MP performans:** 12 MP EXIF’li fotoğraf aç; exposure, HSL, noise reduction ve sharpen slider’larını ayrı ayrı 60 saniye sürükle. Gecikme, takılma, eski preview’ın geri gelmesi, bellek ve ısınmayı kaydet. Ölçüm yapılmadan akıcı kabul etme.
