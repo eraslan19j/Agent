@@ -138,16 +138,18 @@ jobs:
           target_commitish: arena/2abc0dfe-agent
           name: My Vision v1.4.0 — Android APK
           body: |
-            My Vision fotoğraf stüdyosunun kurulabilir Android test sürümü.
+            My Vision fotoğraf ve video stüdyosunun kurulabilir Android test sürümü.
 
             - Paket: `com.myvision.studio`
             - Minimum sistem: Android 7.0 (API 24)
             - Derleme: debug imzalı, kurulabilir APK
             - Üretim: Play Store için imzalı AAB gerekir
 
-            **1.4.0 — Aşama 1:** Sade Apple tarzı tasarım, doğrulamalı IndexedDB proje migrasyonu, sonradan düzenlenebilen metin katmanları, ücretsiz görünümler ve 4K fotoğraf çıktısı. Bu sürüm yalnızca fotoğraf düzenleme içerir.
+            **1.4.0:** Sade tasarım, doğrulamalı IndexedDB projeleri, gelişmiş fotoğraf araçları, 4K fotoğraf çıktısı, 16 ortak efekt ve çok klipli 720p/1080p video editörü.
 
-            Android 7.0 ve üzeri cihazlara kurulabilir. Gerekirse kurulum sırasında bu kaynaktan uygulama yüklemeye izin verin. Bu sürüm hesap, ödeme veya bulut servisi kullanmaz.
+            Web sürümündeki paylaşım alanı galeri/kamera upload'ı, müşteri fotoğrafını seçip düzenleme ve paylaşım bağlantıları sunar. Native paylaşım için ayrıca `VITE_API_URL` ve `VITE_PUBLIC_URL` ile gerçek bir HTTPS sunucusu yapılandırılmalıdır. Özel projeler cihazda kalır; hesap veya ödeme yoktur.
+
+            Android 7.0 ve üzeri cihazlara kurulabilir. Gerekirse kurulum sırasında bu kaynaktan uygulama yüklemeye izin verin.
 
             Derleme raporu: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           prerelease: true

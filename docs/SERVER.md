@@ -71,3 +71,11 @@ Bu sürümde hesap, kimlik doğrulama ve kullanıcı tarafından sunucu içeriğ
 - Production `npm audit --omit=dev`: **0 vulnerability**.
 
 Kanıtlar `.arena/ui-server-regression.mjs`, `.arena/ui-server-results.json` ve `.arena/ui-*.png` altındadır; `.arena` Git’e eklenmez.
+
+## Güncel derleme
+
+- Kod: `08061f8`
+- Android CI: https://github.com/eraslan19j/Agent/actions/runs/42493582392 — **SUCCESS**
+- APK: https://github.com/eraslan19j/Agent/releases/download/my-vision-v1.4.0-debug/My-Vision-1.4.0-debug.apk
+- Boyut: **13.756.519 byte**
+- SHA-256: **`09cc650e99e914d80189d40272c03635f5af1e161fe5b6bd30feaaf6fc0b00e7`**
