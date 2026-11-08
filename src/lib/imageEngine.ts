@@ -1,8 +1,11 @@
 import { DEFAULT_SETTINGS, getPreset } from '../data/presets';
+import { applyAdvancedRendering, straightenCoverScale } from './advancedImageEngine';
 import type { AspectRatio, EditSettings, ExportOptions, PhotoPreset } from '../types';
 
+export { hasAdvancedRendering } from './advancedImageEngine';
+
 export const ratioValue = (ratio: AspectRatio): number | null => {
-  if (ratio === 'original') return null;
+  if (ratio === 'original' || ratio === 'free') return null;
   const [width, height] = ratio.split(':').map(Number);
   return width / height;
 };
@@ -44,6 +47,19 @@ export function computeCrop(width: number, height: number, ratio: AspectRatio) {
   return { x: 0, y: (height - cropHeight) / 2, width, height: cropHeight };
 }
 
+export function computeSettingsCrop(width: number, height: number, settings: Pick<EditSettings, 'aspectRatio' | 'crop'>) {
+  if (settings.aspectRatio === 'free' && settings.crop) {
+    const crop = settings.crop;
+    return {
+      x: Math.max(0, Math.min(width - 1, crop.x * width)),
+      y: Math.max(0, Math.min(height - 1, crop.y * height)),
+      width: Math.max(1, Math.min(width, crop.width * width)),
+      height: Math.max(1, Math.min(height, crop.height * height)),
+    };
+  }
+  return computeCrop(width, height, settings.aspectRatio);
+}
+
 export function normalizedRotation(rotation: number) {
   return ((rotation % 360) + 360) % 360;
 }
@@ -52,7 +68,7 @@ export function previewDimensions(containerWidth: number, containerHeight: numbe
   if (containerWidth <= 0 || containerHeight <= 0 || imageWidth <= 0 || imageHeight <= 0) {
     return { width: 0, height: 0, aspectRatio: 1 };
   }
-  const crop = computeCrop(imageWidth, imageHeight, settings.aspectRatio);
+  const crop = computeSettingsCrop(imageWidth, imageHeight, settings);
   const quarterTurn = normalizedRotation(settings.rotation) % 180 !== 0;
   const outputWidth = quarterTurn ? crop.height : crop.width;
   const outputHeight = quarterTurn ? crop.width : crop.height;
@@ -66,7 +82,7 @@ export function previewDimensions(containerWidth: number, containerHeight: numbe
 }
 
 export function outputDimensions(width: number, height: number, settings: EditSettings, maxDimension: number) {
-  const crop = computeCrop(width, height, settings.aspectRatio);
+  const crop = computeSettingsCrop(width, height, settings);
   const quarterTurn = normalizedRotation(settings.rotation) % 180 !== 0;
   const rotatedWidth = quarterTurn ? crop.height : crop.width;
   const rotatedHeight = quarterTurn ? crop.width : crop.height;
@@ -145,25 +161,27 @@ export async function renderPhoto(source: string, settings: EditSettings, option
   const rotation = normalizedRotation(settings.rotation);
   context.save();
   context.translate(canvas.width / 2, canvas.height / 2);
-  context.rotate(rotation * Math.PI / 180);
+  context.rotate((rotation + settings.straighten) * Math.PI / 180);
   context.scale(settings.flipHorizontal ? -1 : 1, settings.flipVertical ? -1 : 1);
   context.filter = buildCssFilter(settings, getPreset(settings.presetId), false, false);
   context.imageSmoothingEnabled = true;
   context.imageSmoothingQuality = 'high';
   const { crop, scale } = dimensions;
+  const cover = straightenCoverScale(crop.width * scale, crop.height * scale, settings.straighten);
   context.drawImage(
     image,
     crop.x,
     crop.y,
     crop.width,
     crop.height,
-    -crop.width * scale / 2,
-    -crop.height * scale / 2,
-    crop.width * scale,
-    crop.height * scale,
+    -crop.width * scale * cover / 2,
+    -crop.height * scale * cover / 2,
+    crop.width * scale * cover,
+    crop.height * scale * cover,
   );
   context.restore();
   applyPixelAdjustments(context, canvas.width, canvas.height, settings);
+  applyAdvancedRendering(context, canvas.width, canvas.height, settings);
   applyVignette(context, canvas.width, canvas.height, settings.vignette);
 
   return new Promise((resolve, reject) => {
@@ -308,4 +326,17 @@ export async function preparePhoto(file: File): Promise<string> {
   }
 }
 
-export const freshSettings = (): EditSettings => ({ ...DEFAULT_SETTINGS });
+export const freshSettings = (initial?: Partial<EditSettings>): EditSettings => {
+  const base = structuredClone(DEFAULT_SETTINGS);
+  if (!initial) return base;
+  const merged: EditSettings = { ...base, ...initial, hsl: { ...base.hsl }, frame: { ...base.frame, ...initial.frame } };
+  for (const key of Object.keys(base.hsl) as (keyof EditSettings['hsl'])[]) {
+    merged.hsl[key] = { ...base.hsl[key], ...initial.hsl?.[key] };
+  }
+  merged.masks = initial.masks ?? [];
+  merged.repairs = initial.repairs ?? [];
+  merged.texts = initial.texts ?? [];
+  merged.stickers = initial.stickers ?? [];
+  merged.brushStrokes = initial.brushStrokes ?? [];
+  return merged;
+};

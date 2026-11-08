@@ -3,15 +3,21 @@ import {
   ArrowLeft, Check, CircleGauge, Columns2, Contrast, Crop, Download, Eye, Focus,
   FlipHorizontal2, FlipVertical2, Grid3X3, Image as ImageIcon, LoaderCircle,
   LockKeyhole, Redo2, RotateCcw, RotateCw, Save, Share2, SlidersHorizontal,
-  Sparkles, Sun, Thermometer, Undo2, WandSparkles, Waves,
+  Sparkles, Sun, Thermometer, Undo2, WandSparkles, Waves, Palette, Eraser, Shapes,
+  ZoomIn, ZoomOut, Copy, Clipboard, Plus, Trash2, BarChart3,
 } from 'lucide-react';
 import { AUTO_ENHANCE_SETTINGS, getPreset, PRESETS } from '../data/presets';
-import { buildCssFilter, createThumbnail, freshSettings, loadImage, outputDimensions, previewDimensions, renderPhoto } from '../lib/imageEngine';
+import { buildCssFilter, computeSettingsCrop, createThumbnail, freshSettings, hasAdvancedRendering, loadImage, outputDimensions, previewDimensions, renderPhoto } from '../lib/imageEngine';
+import { copySettings, deleteRecipe, loadRecipes, pasteSettings, saveRecipe, type CustomRecipe } from '../lib/recipes';
 import { downloadBlob, shareProject } from '../lib/downloads';
 import type { AspectRatio, EditSettings, EditorSession, EditorTab, ExportOptions, PhotoProject } from '../types';
 import { Brand } from './Brand';
 import { MyVisionLogo } from './MyVisionLogo';
 import { Modal } from './Modal';
+import { EditorSlider } from './EditorSlider';
+import { AdvancedEditorPanel, CreativeEditorPanel, RetouchEditorPanel, type InteractionTool } from './AdvancedEditorPanels';
+import { FreeCropEditor } from './FreeCropEditor';
+import { PhotoHistogram } from './PhotoHistogram';
 
 interface PhotoEditorProps {
   session: EditorSession;
@@ -24,9 +30,12 @@ interface PhotoEditorProps {
 
 const ratios: { value: AspectRatio; label: string; pro?: boolean }[] = [
   { value: 'original', label: 'Orijinal' },
-  { value: '1:1', label: '1:1' },
-  { value: '4:5', label: '4:5' },
+  { value: 'free', label: 'Serbest' },
+  { value: '1:1', label: 'Post 1:1' },
+  { value: '4:5', label: 'Post 4:5' },
+  { value: '9:16', label: 'Story 9:16' },
   { value: '3:4', label: '3:4' },
+  { value: '2:3', label: 'Kapak 2:3' },
   { value: '16:9', label: '16:9', pro: true },
 ];
 
@@ -40,6 +49,8 @@ const adjustments = [
   { key: 'temperature' as const, label: 'Sıcaklık', min: -100, max: 100, icon: Thermometer },
 ];
 
+const strokeSizeForPreview = (size: number, width: number, height: number) => Math.max(1, size / 1000 * Math.min(width, height));
+
 const effects = [
   { key: 'clarity' as const, label: 'Netlik', min: -50, max: 100, icon: Focus },
   { key: 'blur' as const, label: 'Yumuşak odak', min: 0, max: 20, icon: Waves, pro: true },
@@ -49,7 +60,7 @@ const effects = [
 ];
 
 export function PhotoEditor({ session, isPro, onClose, onSave, onRequirePro, onToast }: PhotoEditorProps) {
-  const [settings, setSettings] = useState<EditSettings>(() => ({ ...freshSettings(), ...session.initialSettings, ...(session.applyAutoEnhance ? AUTO_ENHANCE_SETTINGS : {}) }));
+  const [settings, setSettings] = useState<EditSettings>(() => freshSettings({ ...session.initialSettings, ...(session.applyAutoEnhance ? AUTO_ENHANCE_SETTINGS : {}) }));
   const [history, setHistory] = useState<EditSettings[]>([]);
   const [future, setFuture] = useState<EditSettings[]>([]);
   const [activeTab, setActiveTab] = useState<EditorTab>('looks');
@@ -59,17 +70,33 @@ export function PhotoEditor({ session, isPro, onClose, onSave, onRequirePro, onT
   const [showOriginal, setShowOriginal] = useState(false);
   const [comparePosition, setComparePosition] = useState(50);
   const [showGrid, setShowGrid] = useState(false);
+  const [showHistogram, setShowHistogram] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [exportOptions, setExportOptions] = useState<ExportOptions>({ format: 'jpeg', quality: 0.92, maxDimension: 2048 });
   const [busy, setBusy] = useState<'save' | 'export' | 'share' | null>(null);
   const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
   const [stageBounds, setStageBounds] = useState({ width: 0, height: 0 });
   const [adjustGroup, setAdjustGroup] = useState<'light' | 'effects'>('light');
+  const [interactionTool, setInteractionTool] = useState<InteractionTool>('none');
+  const [retouchRadius, setRetouchRadius] = useState(30);
+  const [brushSize, setBrushSize] = useState(22);
+  const [brushColor, setBrushColor] = useState('#FFC400');
+  const [freeCropOpen, setFreeCropOpen] = useState(false);
+  const [advancedPreview, setAdvancedPreview] = useState<string | null>(null);
+  const [previewBusy, setPreviewBusy] = useState(false);
+  const [zoom, setZoom] = useState(1);
+  const [recipes, setRecipes] = useState<CustomRecipe[]>(() => loadRecipes());
+  const [recipeName, setRecipeName] = useState('');
   const sliderStart = useRef<EditSettings | null>(null);
+  const drawingStroke = useRef<string | null>(null);
+  const layerGesture = useRef<{ kind: 'text' | 'sticker' | 'mask'; id: string; rect: DOMRect } | null>(null);
+  const touchPoints = useRef(new Map<number, { x: number; y: number }>());
+  const pinchStart = useRef<{ distance: number; zoom: number } | null>(null);
   const stageContainerRef = useRef<HTMLDivElement>(null);
   const currentPreset = getPreset(settings.presetId);
   const filter = useMemo(() => buildCssFilter(settings), [settings]);
   const isQuarterTurn = settings.rotation % 180 !== 0;
+  const advanced = hasAdvancedRendering(settings);
 
   useEffect(() => {
     let active = true;
@@ -104,6 +131,24 @@ export function PhotoEditor({ session, isPro, onClose, onSave, onRequirePro, onT
     };
   }, []);
 
+  useEffect(() => {
+    if (!advanced || !imageSize.width || !stageBounds.width) return;
+    let active = true;
+    const timer = window.setTimeout(() => {
+      setPreviewBusy(true);
+      const maxDimension = Math.min(1100, Math.max(480, Math.ceil(Math.max(stageBounds.width, stageBounds.height) * Math.min(2, window.devicePixelRatio || 1))));
+      void renderPhoto(session.source, settings, { format: settings.backgroundRemoval ? 'png' : 'jpeg', quality: .82, maxDimension }).then(async blob => {
+        if (!active) return;
+        setAdvancedPreview(URL.createObjectURL(blob));
+      }).catch(() => {
+        if (active) onToast('Gelişmiş önizleme oluşturulamadı; dışa aktarmada daha küçük boyut deneyin.', 'info');
+      }).finally(() => { if (active) setPreviewBusy(false); });
+    }, 140);
+    return () => { active = false; window.clearTimeout(timer); };
+  }, [advanced, settings, session.source, imageSize.width, stageBounds.width, stageBounds.height, onToast]);
+
+  useEffect(() => () => { if (advancedPreview) URL.revokeObjectURL(advancedPreview); }, [advancedPreview]);
+
   const commit = (patch: Partial<EditSettings>, base?: EditSettings) => {
     setHistory((items) => [...items.slice(-39), base || settings]);
     setFuture([]);
@@ -122,6 +167,10 @@ export function PhotoEditor({ session, isPro, onClose, onSave, onRequirePro, onT
       sliderStart.current = null;
     }
   };
+
+  const startHistory = () => { if (!sliderStart.current) sliderStart.current = settings; };
+  const live = (patch: Partial<EditSettings>) => setSettings(current => ({ ...current, ...patch }));
+  const liveSettings = (updater: (current: EditSettings) => EditSettings) => setSettings(updater);
 
   const undo = () => {
     const previous = history.at(-1);
@@ -180,9 +229,10 @@ export function PhotoEditor({ session, isPro, onClose, onSave, onRequirePro, onT
     if (exportOptions.maxDimension > 2048 && !isPro) { onRequirePro(); return; }
     setBusy('export');
     try {
-      const blob = await renderPhoto(session.source, settings, exportOptions);
+      const effectiveOptions = { ...exportOptions, format: settings.backgroundRemoval ? 'png' as const : exportOptions.format };
+      const blob = await renderPhoto(session.source, settings, effectiveOptions);
       const safeName = (name.trim() || 'my-vision').toLocaleLowerCase('tr').replace(/[^a-z0-9ğüşöçıİĞÜŞÖÇ]+/gi, '-').replace(/İ/g, 'i');
-      await downloadBlob(blob, `${safeName}.${exportOptions.format === 'jpeg' ? 'jpg' : 'png'}`);
+      await downloadBlob(blob, `${safeName}.${effectiveOptions.format === 'jpeg' ? 'jpg' : 'png'}`);
       setExportOpen(false);
       onToast('Fotoğrafın hazır. Harika görünüyor!');
     } catch (reason) {
@@ -200,48 +250,133 @@ export function PhotoEditor({ session, isPro, onClose, onSave, onRequirePro, onT
     } finally { setBusy(null); }
   };
 
+  const normalizedPoint = (event: React.PointerEvent, rect: DOMRect) => ({
+    x: Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)),
+    y: Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height)),
+  });
+
+  const stagePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (interactionTool === 'none' || interactionTool === 'radial' || interactionTool === 'linear') return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const point = normalizedPoint(event, rect);
+    if (interactionTool === 'brush') {
+      event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); startHistory();
+      const id = crypto.randomUUID(); drawingStroke.current = id;
+      const stroke = { id, color: brushColor, size: brushSize, opacity: .85, points: [point] };
+      setSettings(current => ({ ...current, brushStrokes: [...current.brushStrokes.slice(-19), stroke] }));
+      return;
+    }
+    const type = interactionTool;
+    if (type === 'heal' || type === 'object' || type === 'redeye') {
+      event.preventDefault();
+      commit({ repairs: [...settings.repairs.slice(-39), { id: crypto.randomUUID(), type, ...point, radius: retouchRadius / Math.min(rect.width, rect.height) }] });
+    }
+  };
+
+  const stagePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const id = drawingStroke.current;
+    if (!id || interactionTool !== 'brush') return;
+    const point = normalizedPoint(event, event.currentTarget.getBoundingClientRect());
+    setSettings(current => ({ ...current, brushStrokes: current.brushStrokes.map(stroke => {
+      if (stroke.id !== id) return stroke;
+      const last = stroke.points.at(-1);
+      if (last && Math.hypot(last.x - point.x, last.y - point.y) < .003) return stroke;
+      return { ...stroke, points: [...stroke.points.slice(-239), point] };
+    }) }));
+  };
+
+  const stagePointerUp = () => { if (drawingStroke.current) { drawingStroke.current = null; endSlider(); } };
+
+  const startLayerDrag = (event: React.PointerEvent, kind: 'text' | 'sticker' | 'mask', id: string) => {
+    event.preventDefault(); event.stopPropagation();
+    const stage = event.currentTarget.closest('.photo-stage');
+    if (!stage) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    layerGesture.current = { kind, id, rect: stage.getBoundingClientRect() };
+    startHistory();
+  };
+  const moveLayer = (event: React.PointerEvent) => {
+    const gesture = layerGesture.current;
+    if (!gesture) return;
+    event.stopPropagation();
+    const point = normalizedPoint(event, gesture.rect);
+    if (gesture.kind === 'text') liveSettings(current => ({ ...current, texts: current.texts.map(item => item.id === gesture.id ? { ...item, ...point } : item) }));
+    else if (gesture.kind === 'sticker') liveSettings(current => ({ ...current, stickers: current.stickers.map(item => item.id === gesture.id ? { ...item, ...point } : item) }));
+    else liveSettings(current => ({ ...current, masks: current.masks.map(item => item.id === gesture.id ? { ...item, ...point } : item) }));
+  };
+  const endLayerDrag = () => { if (layerGesture.current) { layerGesture.current = null; endSlider(); } };
+
+  const pinchDown = (event: React.PointerEvent) => {
+    if (event.pointerType !== 'touch' || interactionTool !== 'none') return;
+    touchPoints.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (touchPoints.current.size === 2) {
+      const [a, b] = [...touchPoints.current.values()];
+      pinchStart.current = { distance: Math.hypot(a.x - b.x, a.y - b.y), zoom };
+    }
+  };
+  const pinchMove = (event: React.PointerEvent) => {
+    if (!touchPoints.current.has(event.pointerId)) return;
+    touchPoints.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (touchPoints.current.size === 2 && pinchStart.current) {
+      const [a, b] = [...touchPoints.current.values()];
+      const distance = Math.hypot(a.x - b.x, a.y - b.y);
+      setZoom(Math.max(1, Math.min(4, pinchStart.current.zoom * distance / Math.max(1, pinchStart.current.distance))));
+    }
+  };
+  const pinchUp = (event: React.PointerEvent) => { touchPoints.current.delete(event.pointerId); if (touchPoints.current.size < 2) pinchStart.current = null; };
+
   const output = imageSize.width ? outputDimensions(imageSize.width, imageSize.height, settings, exportOptions.maxDimension) : null;
   const preview = previewDimensions(stageBounds.width, stageBounds.height, imageSize.width, imageSize.height, settings);
   const previewImageWidth = isQuarterTurn ? preview.height : preview.width;
-  const previewImageHeight = isQuarterTurn ? preview.width : preview.height;
-  const transform = `translate(-50%, -50%) rotate(${settings.rotation}deg) scale(${settings.flipHorizontal ? -1 : 1}, ${settings.flipVertical ? -1 : 1})`;
+  const crop = imageSize.width ? computeSettingsCrop(imageSize.width, imageSize.height, settings) : null;
+  const previewScale = crop ? previewImageWidth / crop.width : 1;
+  const cropOffsetX = crop ? (imageSize.width / 2 - crop.x - crop.width / 2) * previewScale : 0;
+  const cropOffsetY = crop ? (imageSize.height / 2 - crop.y - crop.height / 2) * previewScale : 0;
+  const transform = `translate(-50%, -50%) rotate(${settings.rotation}deg) scale(${settings.flipHorizontal ? -1 : 1}, ${settings.flipVertical ? -1 : 1}) translate(${cropOffsetX}px, ${cropOffsetY}px)`;
   const previewImageStyle: React.CSSProperties = {
-    width: previewImageWidth || '100%',
-    height: previewImageHeight || '100%',
+    width: crop ? imageSize.width * previewScale : '100%',
+    height: crop ? imageSize.height * previewScale : '100%',
     maxWidth: 'none',
-    objectFit: 'cover',
+    objectFit: 'fill',
     transform,
   };
+  const advancedImageStyle: React.CSSProperties = { left: 0, top: 0, width: '100%', height: '100%', objectFit: 'fill', transform: 'none' };
 
   return (
     <div className="editor-shell">
       <header className="editor-header">
         <div className="editor-header__left"><button className="icon-button" onClick={onClose} aria-label="Editörden çık"><ArrowLeft size={21} /></button><span className="editor-brand"><Brand compact /></span><span className="editor-divider" /><input className="project-name-input" value={name} onChange={(event) => setName(event.target.value)} aria-label="Proje adı" maxLength={48} /></div>
         <div className="editor-header__center"><button className="icon-button" onClick={undo} disabled={!history.length} aria-label="Geri al"><Undo2 size={19} /></button><button className="icon-button" onClick={redo} disabled={!future.length} aria-label="Yinele"><Redo2 size={19} /></button></div>
-        <div className="editor-header__actions"><button className="button button--ghost editor-save" onClick={() => void save()} disabled={busy !== null}>{busy === 'save' ? <LoaderCircle className="spin" size={17} /> : <Save size={17} />}<span>Kaydet</span></button><button className="button button--lime button--small" onClick={() => setExportOpen(true)}><Download size={17} /><span>Dışa aktar</span></button></div>
+        <div className="editor-header__actions"><button className="button button--ghost editor-save" onClick={() => void save()} disabled={busy !== null}>{busy === 'save' ? <LoaderCircle className="spin" size={17} /> : <Save size={17} />}<span>Kaydet</span></button><button className="button button--lime button--small" onClick={() => { if (settings.backgroundRemoval) setExportOptions(options => ({ ...options, format: 'png' })); setExportOpen(true); }}><Download size={17} /><span>Dışa aktar</span></button></div>
       </header>
 
       <main className="editor-workspace">
         <section className="canvas-panel">
           <div className="canvas-toolbar">
             <span className="canvas-label"><i /> CANLI ÖNİZLEME</span>
-            <div><button className={compare ? 'tool-button active' : 'tool-button'} onClick={() => { setCompare(!compare); setShowOriginal(false); }}><Columns2 size={16} /> <span>Önce / Sonra</span></button><button className={showGrid ? 'tool-button active' : 'tool-button'} onClick={() => setShowGrid(!showGrid)} aria-label="Izgara"><Grid3X3 size={17} /></button><button className="tool-button" onClick={share} disabled={busy !== null} aria-label="Paylaş">{busy === 'share' ? <LoaderCircle className="spin" size={17} /> : <Share2 size={17} />}</button></div>
+            <div><button className={compare ? 'tool-button active' : 'tool-button'} onClick={() => { setCompare(!compare); setShowOriginal(false); }}><Columns2 size={16} /> <span>Önce / Sonra</span></button><button className={showHistogram ? 'tool-button active' : 'tool-button'} onClick={() => setShowHistogram(!showHistogram)} aria-label="Histogram"><BarChart3 size={17} /></button><button className={showGrid ? 'tool-button active' : 'tool-button'} onClick={() => setShowGrid(!showGrid)} aria-label="Izgara"><Grid3X3 size={17} /></button><button className="tool-button" onClick={share} disabled={busy !== null} aria-label="Paylaş">{busy === 'share' ? <LoaderCircle className="spin" size={17} /> : <Share2 size={17} />}</button></div>
           </div>
-          <div className="canvas-stage" ref={stageContainerRef}>
-            <div className="photo-stage" style={{ width: preview.width || '100%', height: preview.height || '100%', aspectRatio: preview.aspectRatio }}>
+          <div className="canvas-stage" ref={stageContainerRef} onPointerDown={pinchDown} onPointerMove={pinchMove} onPointerUp={pinchUp} onPointerCancel={pinchUp}>
+            <div className={`photo-stage ${interactionTool !== 'none' ? 'photo-stage--interactive' : ''}`} style={{ width: preview.width || '100%', height: preview.height || '100%', aspectRatio: preview.aspectRatio, transform: `scale(${zoom})` }} onPointerDown={stagePointerDown} onPointerMove={stagePointerMove} onPointerUp={stagePointerUp} onPointerCancel={stagePointerUp}>
               <div className="photo-stage__image">
-                <img src={session.source} alt="Düzenlenen fotoğraf" style={{ ...previewImageStyle, filter }} draggable={false} />
+                <img src={advanced && advancedPreview ? advancedPreview : session.source} alt="Düzenlenen fotoğraf" style={advanced && advancedPreview ? advancedImageStyle : { ...previewImageStyle, filter }} draggable={false} />
               </div>
               {(compare || showOriginal) && <div className="before-image" style={{ clipPath: showOriginal ? 'inset(0)' : `inset(0 ${100 - comparePosition}% 0 0)` }}><img src={session.source} alt="Düzenleme öncesi" style={previewImageStyle} draggable={false} /></div>}
-              {settings.vignette > 0 && !showOriginal && <div className="vignette-overlay" style={{ opacity: Math.min(1, settings.vignette / 100) }} />}
-              {settings.grain > 0 && !showOriginal && <div className="grain-overlay" style={{ opacity: Math.min(0.65, settings.grain / 140) }} />}
+              {!advanced && settings.vignette > 0 && !showOriginal && <div className="vignette-overlay" style={{ opacity: Math.min(1, settings.vignette / 100) }} />}
+              {!advanced && settings.grain > 0 && !showOriginal && <div className="grain-overlay" style={{ opacity: Math.min(0.65, settings.grain / 140) }} />}
+              {advanced && previewBusy && <svg className="brush-live" viewBox="0 0 1 1" preserveAspectRatio="none">{settings.brushStrokes.map(stroke => <polyline key={stroke.id} points={stroke.points.map(point => `${point.x},${point.y}`).join(' ')} fill="none" stroke={stroke.color} strokeOpacity={stroke.opacity} strokeWidth={stroke.size / 1000} vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" style={{ strokeWidth: `${strokeSizeForPreview(stroke.size, preview.width, preview.height)}px` }} />)}</svg>}
+              {settings.masks.map(mask => <div key={mask.id} className={`mask-marker mask-marker--${mask.type}`} style={{ left: `${mask.x * 100}%`, top: `${mask.y * 100}%`, width: `${mask.radius * 200}%`, aspectRatio: mask.type === 'radial' ? 1 : '1 / 5', transform: `translate(-50%,-50%) rotate(${mask.angle}deg)` }} onPointerDown={event => startLayerDrag(event, 'mask', mask.id)} onPointerMove={moveLayer} onPointerUp={endLayerDrag} onPointerCancel={endLayerDrag} />)}
+              {settings.texts.map(layer => <div key={layer.id} className="design-layer design-text" style={{ left: `${layer.x * 100}%`, top: `${layer.y * 100}%`, color: layer.color, fontFamily: layer.font === 'serif' ? '"Instrument Serif",serif' : layer.font === 'mono' ? 'monospace' : 'Manrope,sans-serif', fontSize: `${Math.max(10, layer.size / 550 * Math.min(preview.width, preview.height))}px`, transform: `translate(-50%,-50%) rotate(${layer.rotation}deg)`, textAlign: layer.align }} onPointerDown={event => startLayerDrag(event, 'text', layer.id)} onPointerMove={moveLayer} onPointerUp={endLayerDrag} onPointerCancel={endLayerDrag}><span style={{ opacity: previewBusy || !advancedPreview ? 1 : 0 }}>{layer.text}</span></div>)}
+              {settings.stickers.map(layer => <div key={layer.id} className="design-layer design-sticker" style={{ left: `${layer.x * 100}%`, top: `${layer.y * 100}%`, fontSize: `${Math.max(12, layer.size / 550 * Math.min(preview.width, preview.height))}px`, transform: `translate(-50%,-50%) rotate(${layer.rotation}deg)` }} onPointerDown={event => startLayerDrag(event, 'sticker', layer.id)} onPointerMove={moveLayer} onPointerUp={endLayerDrag} onPointerCancel={endLayerDrag}><span style={{ opacity: previewBusy || !advancedPreview ? 1 : 0 }}>{layer.value}</span></div>)}
               {!compare && <button className={`original-hold ${showOriginal ? 'active' : ''}`} onPointerDown={(event) => { event.preventDefault(); setShowOriginal(true); }} onPointerUp={() => setShowOriginal(false)} onPointerLeave={() => setShowOriginal(false)} onContextMenu={(event) => event.preventDefault()} aria-label="Orijinal fotoğrafı görmek için basılı tut"><Eye size={14} /><span>{showOriginal ? 'ORİJİNAL' : 'Basılı tut: Orijinal'}</span></button>}
               {showGrid && <div className="composition-grid"><i /><i /><i /><i /></div>}
               {compare && <><span className="compare-label compare-label--before">ÖNCE</span><span className="compare-label compare-label--after">SONRA</span><div className="compare-line" style={{ left: `${comparePosition}%` }}><span><Columns2 size={16} /></span></div><input className="compare-range" type="range" min="0" max="100" value={comparePosition} onChange={(event) => setComparePosition(Number(event.target.value))} aria-label="Önce ve sonra karşılaştırması" /></>}
               <span className="preset-indicator">{currentPreset.name}{settings.intensity > 0 && currentPreset.id !== 'original' ? ` · ${settings.intensity}%` : ''}</span>
+              {previewBusy && <span className="advanced-preview-status"><LoaderCircle className="spin" size={12} /> Önizleme</span>}
+              {showHistogram && <PhotoHistogram source={session.source} settings={settings} />}
             </div>
           </div>
-          <div className="canvas-footer"><span>{imageSize.width ? `${imageSize.width} × ${imageSize.height} px` : 'Fotoğraf hazırlanıyor…'}</span><button onClick={() => { commit(freshSettings()); onToast('Tüm ayarlar sıfırlandı.', 'info'); }}><RotateCcw size={14} /> Sıfırla</button></div>
+          <div className="canvas-footer"><span>{imageSize.width ? `${imageSize.width} × ${imageSize.height} px` : 'Fotoğraf hazırlanıyor…'}</span><div className="zoom-controls"><button onClick={() => setZoom(value => Math.max(1, value - .25))} disabled={zoom <= 1} aria-label="Uzaklaştır"><ZoomOut size={15} /></button><span>{Math.round(zoom * 100)}%</span><button onClick={() => setZoom(value => Math.min(4, value + .25))} disabled={zoom >= 4} aria-label="Yakınlaştır"><ZoomIn size={15} /></button></div><button onClick={() => { commit(freshSettings()); setAdvancedPreview(null); onToast('Tüm ayarlar sıfırlandı.', 'info'); }}><RotateCcw size={14} /> Sıfırla</button></div>
         </section>
 
         <aside className="editor-panel">
@@ -249,6 +384,9 @@ export function PhotoEditor({ session, isPro, onClose, onSave, onRequirePro, onT
             <button role="tab" aria-selected={activeTab === 'looks'} className={activeTab === 'looks' ? 'active' : ''} onClick={() => setActiveTab('looks')}><WandSparkles size={18} /><span>Görünümler</span></button>
             <button role="tab" aria-selected={activeTab === 'adjust'} className={activeTab === 'adjust' ? 'active' : ''} onClick={() => setActiveTab('adjust')}><SlidersHorizontal size={18} /><span>Ayarlar</span></button>
             <button role="tab" aria-selected={activeTab === 'crop'} className={activeTab === 'crop' ? 'active' : ''} onClick={() => setActiveTab('crop')}><Crop size={18} /><span>Kırp</span></button>
+            <button role="tab" aria-selected={activeTab === 'color'} className={activeTab === 'color' ? 'active' : ''} onClick={() => setActiveTab('color')}><Palette size={18} /><span>Renk</span></button>
+            <button role="tab" aria-selected={activeTab === 'retouch'} className={activeTab === 'retouch' ? 'active' : ''} onClick={() => setActiveTab('retouch')}><Eraser size={18} /><span>Rötuş</span></button>
+            <button role="tab" aria-selected={activeTab === 'create'} className={activeTab === 'create' ? 'active' : ''} onClick={() => setActiveTab('create')}><Shapes size={18} /><span>Tasarla</span></button>
           </div>
           <div className="editor-panel__content">
             {activeTab === 'looks' && <div className="looks-panel">
@@ -259,6 +397,9 @@ export function PhotoEditor({ session, isPro, onClose, onSave, onRequirePro, onT
                 </button>)}
               </div>
               {settings.presetId !== 'original' && <div className="intensity-control"><EditorSlider label="Görünüm yoğunluğu" value={settings.intensity} min={0} max={100} onChange={(value) => updateSlider('intensity', value)} onStart={() => { sliderStart.current = settings; }} onEnd={endSlider} onReset={() => commit({ intensity: 100 })} /></div>}
+              <div className="recipe-tools"><div className="recipe-actions"><button onClick={() => { copySettings(settings); onToast('Düzenleme ayarları kopyalandı.'); }}><Copy size={14} /> Ayarları kopyala</button><button onClick={() => { const pasted = pasteSettings(); if (pasted) { commit(pasted); onToast('Kopyalanan ayarlar uygulandı.'); } else onToast('Kopyalanmış ayar bulunamadı.', 'info'); }}><Clipboard size={14} /> Yapıştır</button></div><div className="recipe-save"><input value={recipeName} onChange={event => setRecipeName(event.target.value)} maxLength={32} placeholder="Özel tarif adı" aria-label="Özel tarif adı" /><button onClick={() => { if (!recipeName.trim()) return; try { setRecipes(saveRecipe(recipeName, settings)); setRecipeName(''); onToast('Özel tarif cihazına kaydedildi.'); } catch { onToast('Tarif kaydedilemedi; depolama alanını kontrol et.', 'info'); } }} disabled={!recipeName.trim()} aria-label="Tarifi kaydet"><Plus size={16} /></button></div>
+                {recipes.map(recipe => <div className="recipe-row" key={recipe.id}><button onClick={() => commit(recipe.settings)}><WandSparkles size={13} /><span>{recipe.name}</span></button><button onClick={() => setRecipes(deleteRecipe(recipe.id))} aria-label={`${recipe.name} tarifini sil`}><Trash2 size={13} /></button></div>)}
+              </div>
               <div className="editor-tip"><Sparkles size={17} /><p><strong>Küçük bir editör sırrı</strong>Görünümü %70–85 yoğunlukta kullanarak daha doğal bir sonuç elde edebilirsin.</p></div>
             </div>}
             {activeTab === 'adjust' && <div className="adjust-panel">
@@ -270,15 +411,21 @@ export function PhotoEditor({ session, isPro, onClose, onSave, onRequirePro, onT
             </div>}
             {activeTab === 'crop' && <div className="crop-panel">
               <div className="panel-heading"><div><span className="eyebrow">KADRAJ & AÇI</span><h3>Hikâyeye odaklan.</h3></div></div>
-              <h4 className="control-label">En boy oranı</h4><div className="ratio-grid">{ratios.map((ratio) => <button key={ratio.value} className={settings.aspectRatio === ratio.value ? 'active' : ''} onClick={() => { if (ratio.pro && !isPro) { onRequirePro(); return; } commit({ aspectRatio: ratio.value }); }}><span className={`ratio-icon ratio-icon--${ratio.value.replace(':', '-')}`} /><strong>{ratio.label}</strong>{ratio.pro && !isPro && <LockKeyhole size={11} />}</button>)}</div>
+              <h4 className="control-label">En boy oranı</h4><div className="ratio-grid">{ratios.map((ratio) => <button key={ratio.value} className={settings.aspectRatio === ratio.value ? 'active' : ''} onClick={() => { if (ratio.pro && !isPro) { onRequirePro(); return; } commit({ aspectRatio: ratio.value, ...(ratio.value === 'free' && !settings.crop ? { crop: { x: .08, y: .08, width: .84, height: .84 } } : {}) }); if (ratio.value === 'free') setFreeCropOpen(true); }}><span className={`ratio-icon ratio-icon--${ratio.value.replace(':', '-')}`} /><strong>{ratio.label}</strong>{ratio.pro && !isPro && <LockKeyhole size={11} />}</button>)}</div>
+              {settings.aspectRatio === 'free' && <button className="free-crop-open" onClick={() => setFreeCropOpen(true)}><Crop size={15} /> Serbest kadrajı düzenle</button>}
+              <div className="geometry-controls"><EditorSlider label="Straighten" value={settings.straighten} min={-45} max={45} displayValue={`${settings.straighten}°`} onChange={value => live({ straighten: value })} onStart={startHistory} onEnd={endSlider} onReset={() => commit({ straighten: 0 })} /><EditorSlider label="Yatay perspektif" value={settings.perspectiveX} min={-35} max={35} onChange={value => live({ perspectiveX: value })} onStart={startHistory} onEnd={endSlider} onReset={() => commit({ perspectiveX: 0 })} /><EditorSlider label="Dikey perspektif" value={settings.perspectiveY} min={-35} max={35} onChange={value => live({ perspectiveY: value })} onStart={startHistory} onEnd={endSlider} onReset={() => commit({ perspectiveY: 0 })} /></div>
               <h4 className="control-label">Döndür</h4><div className="transform-row"><button onClick={() => commit({ rotation: settings.rotation - 90 })}><RotateCcw size={21} /><span>90° sola</span></button><button onClick={() => commit({ rotation: settings.rotation + 90 })}><RotateCw size={21} /><span>90° sağa</span></button></div>
               <h4 className="control-label">Aynala</h4><div className="transform-row"><button className={settings.flipHorizontal ? 'active' : ''} onClick={() => commit({ flipHorizontal: !settings.flipHorizontal })}><FlipHorizontal2 size={21} /><span>Yatay</span></button><button className={settings.flipVertical ? 'active' : ''} onClick={() => commit({ flipVertical: !settings.flipVertical })}><FlipVertical2 size={21} /><span>Dikey</span></button></div>
               <div className="editor-tip"><Crop size={17} /><p><strong>Sosyal medyaya hazır</strong>4:5 Instagram gönderileri, 1:1 profil ve ürün kareleri için idealdir.</p></div>
             </div>}
+            {activeTab === 'color' && <AdvancedEditorPanel settings={settings} commit={commit} live={live} liveSettings={liveSettings} start={startHistory} end={endSlider} />}
+            {activeTab === 'retouch' && <RetouchEditorPanel settings={settings} commit={commit} live={live} liveSettings={liveSettings} start={startHistory} end={endSlider} tool={interactionTool} setTool={setInteractionTool} radius={retouchRadius} setRadius={setRetouchRadius} />}
+            {activeTab === 'create' && <CreativeEditorPanel settings={settings} commit={commit} live={live} liveSettings={liveSettings} start={startHistory} end={endSlider} tool={interactionTool} setTool={setInteractionTool} brushSize={brushSize} setBrushSize={setBrushSize} brushColor={brushColor} setBrushColor={setBrushColor} />}
           </div>
         </aside>
       </main>
 
+      {freeCropOpen && <FreeCropEditor source={session.source} initialCrop={settings.crop} onClose={() => setFreeCropOpen(false)} onApply={nextCrop => { commit({ aspectRatio: 'free', crop: nextCrop }); setFreeCropOpen(false); }} />}
       {busy === 'share' && <div className="editor-share-status glass-modal" role="status"><MyVisionLogo variant="wordmark" size={34} /><LoaderCircle className="spin" size={22} /><strong>Görüşün paylaşıma hazırlanıyor</strong></div>}
       {exportOpen && <Modal title="Fotoğrafını dışa aktar" onClose={() => busy === null && setExportOpen(false)} className="export-modal">
         <div className="export-preview"><img src={session.source} alt="Dışa aktarılacak fotoğraf" style={{ filter }} /><span><Check size={15} /> Düzenlemeler uygulandı</span></div>
@@ -289,30 +436,6 @@ export function PhotoEditor({ session, isPro, onClose, onSave, onRequirePro, onT
         <button className="button button--lime export-confirm" onClick={() => void exportPhoto()} disabled={busy !== null}>{busy === 'export' ? <LoaderCircle className="spin" size={19} /> : <Download size={19} />}{busy === 'export' ? 'Fotoğraf işleniyor…' : 'Fotoğrafı indir'}</button>
         <p className="export-note">Orijinal fotoğrafın değiştirilmez. Yeni bir kopya oluşturulur.</p>
       </Modal>}
-    </div>
-  );
-}
-
-interface EditorSliderProps {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  icon?: typeof Sun;
-  neutral?: number;
-  displayValue?: string;
-  disabled?: boolean;
-  onChange: (value: number) => void;
-  onStart?: () => void;
-  onEnd?: () => void;
-  onReset?: () => void;
-}
-
-function EditorSlider({ label, value, min, max, icon: Icon, neutral = 0, displayValue, disabled, onChange, onStart, onEnd, onReset }: EditorSliderProps) {
-  return (
-    <div className={`editor-slider ${disabled ? 'disabled' : ''}`}>
-      <div className="editor-slider__label"><span>{Icon && <Icon size={15} />}{label}</span><button onDoubleClick={onReset} onClick={onReset} aria-label={`${label} sıfırla`}>{displayValue || `${value > 0 && neutral === 0 ? '+' : ''}${value}`}</button></div>
-      <input type="range" min={min} max={max} value={value} disabled={disabled} style={{ '--range-progress': `${(value - min) / (max - min) * 100}%` } as React.CSSProperties} onPointerDown={onStart} onChange={(event) => onChange(Number(event.target.value))} onPointerUp={onEnd} onPointerCancel={onEnd} onKeyUp={onEnd} aria-label={label} />
     </div>
   );
 }

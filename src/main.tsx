@@ -10,6 +10,8 @@ import '@fontsource/instrument-serif/latin-ext-400.css';
 import './styles.css';
 import './liquid-glass.css';
 import './preferences.css';
+import './editor-advanced.css';
+import './studio.css';
 import App from './App';
 import { applyPreferences, loadPreferences } from './lib/preferences';
 

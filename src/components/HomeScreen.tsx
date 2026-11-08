@@ -1,4 +1,4 @@
-import { ArrowUpRight, Camera, Crown, Folder, ImagePlus, Images, ShieldCheck, Sparkles, WandSparkles } from 'lucide-react';
+import { ArrowUpRight, Camera, Crown, Folder, ImagePlus, Images, LayoutGrid, ListChecks, ShieldCheck, Sparkles, WandSparkles } from 'lucide-react';
 import type { PhotoProject } from '../types';
 import { MyVisionLogo } from './MyVisionLogo';
 
@@ -12,9 +12,11 @@ interface HomeScreenProps {
   onPro: () => void;
   onProjects: () => void;
   onDiscover: () => void;
+  onCollage: () => void;
+  onBatch: () => void;
 }
 
-export function HomeScreen({ projects, isPro, onOpen, onCreate, onCamera, onAuto, onPro, onProjects, onDiscover }: HomeScreenProps) {
+export function HomeScreen({ projects, isPro, onOpen, onCreate, onCamera, onAuto, onPro, onProjects, onDiscover, onCollage, onBatch }: HomeScreenProps) {
   return (
     <div className="screen home-screen page-enter">
       <header className="home-header">
@@ -41,6 +43,8 @@ export function HomeScreen({ projects, isPro, onOpen, onCreate, onCamera, onAuto
           <button className="quick-card glass-panel" onClick={onCreate}><span className="quick-card__icon quick-card__icon--lime"><ImagePlus size={21} /></span><span><strong>Galeriden seç</strong><small>Kendi fotoğrafınla başla</small></span><ArrowUpRight size={16} /></button>
           <button className="quick-card glass-panel" onClick={onCamera}><span className="quick-card__icon quick-card__icon--violet"><Camera size={21} /></span><span><strong>Fotoğraf çek</strong><small>Anı yakala, anında düzenle</small></span><ArrowUpRight size={16} /></button>
           <button className="quick-card glass-panel" onClick={onAuto}><span className="quick-card__icon quick-card__icon--blue"><WandSparkles size={21} /></span><span><strong>Otomatik iyileştir</strong><small>Dengeli bir başlangıç yap</small></span><ArrowUpRight size={16} /></button>
+          <button className="quick-card glass-panel" onClick={onCollage}><span className="quick-card__icon quick-card__icon--lime"><LayoutGrid size={21} /></span><span><strong>Kolaj oluştur</strong><small>Story, Post ve Kapak</small></span><ArrowUpRight size={16} /></button>
+          <button className="quick-card glass-panel" onClick={onBatch}><span className="quick-card__icon quick-card__icon--violet"><ListChecks size={21} /></span><span><strong>Toplu işlem</strong><small>Tarif, filigran ve çıktı</small></span><ArrowUpRight size={16} /></button>
         </div>
       </section>
 

@@ -23,27 +23,21 @@ export const PRESETS: PhotoPreset[] = [
   { id: 'wild', name: 'Doğada', category: 'Seyahat', pro: false, accent: '#8da66a', tone: tone({ brightness: 1.03, contrast: 1.14, saturation: 1.22, hueRotate: -7 }) },
   { id: 'silver', name: 'Gümüş', category: 'Siyah Beyaz', pro: true, accent: '#a7abb3', tone: tone({ brightness: 1.08, contrast: 1.08, saturation: 0, grayscale: 1 }) },
   { id: 'postcard', name: 'Kartpostal', category: 'Seyahat', pro: true, accent: '#e4a877', tone: tone({ brightness: 1.05, contrast: 1.12, saturation: 1.2, sepia: 0.04 }) },
+  { id: 'landscape', name: 'Canlı Manzara', category: 'Manzara', pro: false, accent: '#65a879', tone: tone({ brightness: 1.02, contrast: 1.18, saturation: 1.24, hueRotate: -3 }) },
+  { id: 'food', name: 'Sofra', category: 'Yemek', pro: false, accent: '#d98d55', tone: tone({ brightness: 1.08, contrast: 1.1, saturation: 1.18, sepia: 0.08 }) },
+  { id: 'night', name: 'Gece Işıkları', category: 'Gece', pro: true, accent: '#627ac5', tone: tone({ brightness: 1.04, contrast: 1.22, saturation: 0.9, hueRotate: 7 }) },
+  { id: 'vintage', name: 'Vintage 1974', category: 'Vintage', pro: false, accent: '#b68b66', tone: tone({ brightness: 1.03, contrast: 0.88, saturation: 0.72, sepia: 0.24, hueRotate: -5 }) },
 ];
 
+const neutralHsl = () => ({ hue: 0, saturation: 0, luminance: 0 });
 export const DEFAULT_SETTINGS: EditSettings = {
-  presetId: 'original',
-  intensity: 100,
-  exposure: 0,
-  brightness: 100,
-  contrast: 100,
-  saturation: 100,
-  clarity: 0,
-  blur: 0,
-  temperature: 0,
-  highlights: 0,
-  shadows: 0,
-  fade: 0,
-  vignette: 0,
-  grain: 0,
-  rotation: 0,
-  flipHorizontal: false,
-  flipVertical: false,
-  aspectRatio: 'original',
+  presetId: 'original', intensity: 100, exposure: 0, brightness: 100, contrast: 100, saturation: 100,
+  clarity: 0, blur: 0, temperature: 0, highlights: 0, shadows: 0, fade: 0, vignette: 0, grain: 0,
+  rotation: 0, straighten: 0, perspectiveX: 0, perspectiveY: 0,
+  flipHorizontal: false, flipVertical: false, aspectRatio: 'original',
+  noiseReduction: 0, sharpen: 0, curveShadows: 0, curveMidtones: 0, curveHighlights: 0,
+  hsl: { red: neutralHsl(), orange: neutralHsl(), yellow: neutralHsl(), green: neutralHsl(), cyan: neutralHsl(), blue: neutralHsl(), purple: neutralHsl() },
+  masks: [], repairs: [], texts: [], stickers: [], brushStrokes: [], frame: { width: 0, color: '#FFFFFF' }, backgroundRemoval: 0,
 };
 
 export const AUTO_ENHANCE_SETTINGS: Partial<EditSettings> = {

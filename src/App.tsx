@@ -10,6 +10,9 @@ import { ProjectsScreen } from './components/ProjectsScreen';
 import { ProfileScreen } from './components/ProfileScreen';
 import type { InfoTopic } from './components/ProfileScreen';
 import SettingsScreen from './components/SettingsScreen';
+import { CollageStudio } from './components/CollageStudio';
+import { BatchStudio } from './components/BatchStudio';
+import { Onboarding } from './components/Onboarding';
 import { PhotoEditor } from './components/PhotoEditor';
 import { Paywall } from './components/Paywall';
 import { InfoModal } from './components/InfoModal';
@@ -18,7 +21,7 @@ import { Toast } from './components/Toast';
 import type { ToastMessage } from './components/Toast';
 import { preparePhoto } from './lib/imageEngine';
 import { applyPreferences, getDynamicAccent, loadPreferences, persistPreferences, watchSystemTheme, type AppPreferences } from './lib/preferences';
-import { loadPreviewPro, loadProjects, persistProjects, savePreviewPro } from './lib/storage';
+import { hasOnboarded, loadPreviewPro, loadProjects, persistProjects, savePreviewPro, setOnboarded } from './lib/storage';
 import { hasNativePro, isNativeBillingAvailable, purchaseNativePlan, restoreNativePurchases } from './lib/billing';
 import type { DiscoverPhoto } from './lib/discoverService';
 import type { AppView, EditorSession, PhotoProject, PlanInterval } from './types';
@@ -27,7 +30,9 @@ export default function App() {
   const [view, setView] = useState<AppView>('home');
   const [projects, setProjects] = useState<PhotoProject[]>(() => loadProjects());
   const [session, setSession] = useState<EditorSession | null>(null);
+  const [studio, setStudio] = useState<'collage' | 'batch' | null>(null);
   const [isPro, setIsPro] = useState(() => loadPreviewPro());
+  const [onboardingOpen, setOnboardingOpen] = useState(() => !hasOnboarded());
   const [paywallOpen, setPaywallOpen] = useState(false);
   const [infoTopic, setInfoTopic] = useState<InfoTopic | null>(null);
   const [importing, setImporting] = useState(false);
@@ -116,25 +121,27 @@ export default function App() {
     if (!Capacitor.isNativePlatform()) return;
     const listener = CapacitorApp.addListener('backButton', () => {
       if (showSplash) setShowSplash(false);
+      else if (onboardingOpen) { setOnboarded(); setOnboardingOpen(false); }
       else if (paywallOpen) setPaywallOpen(false);
       else if (infoTopic) setInfoTopic(null);
       else if (discoverOverlayOpen) discoverCloseHandler.current?.();
       else if (importing) cancelImport();
+      else if (studio) setStudio(null);
       else if (session) setSession(null);
       else if (view === 'settings') setView('profile');
       else if (view !== 'home') setView('home');
       else void CapacitorApp.exitApp();
     });
     return () => { void listener.then((handle) => handle.remove()); };
-  }, [showSplash, paywallOpen, infoTopic, discoverOverlayOpen, importing, session, view, cancelImport]);
+  }, [showSplash, onboardingOpen, paywallOpen, infoTopic, discoverOverlayOpen, importing, studio, session, view, cancelImport]);
 
   useEffect(() => {
     window.scrollTo(0, 0);
-    if (!session && !discoverOverlayOpen && !importing) return;
+    if (!session && !discoverOverlayOpen && !importing && !studio) return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = previousOverflow; };
-  }, [session, discoverOverlayOpen, importing]);
+  }, [session, discoverOverlayOpen, importing, studio]);
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
@@ -191,6 +198,9 @@ export default function App() {
       id: existing?.id || crypto.randomUUID(),
       createdAt: existing?.createdAt || Date.now(),
       updatedAt: Date.now(),
+      favorite: existing?.favorite,
+      album: existing?.album,
+      tags: existing?.tags,
       isSample: false,
     };
     const next = [saved, ...projects.filter((project) => project.id !== saved.id)];
@@ -205,6 +215,12 @@ export default function App() {
       setProjects(next);
       showToast('Proje cihazından silindi.', 'info');
     } else showToast('Proje silinemedi.', 'info');
+  };
+
+  const updateProject = (id: string, patch: Partial<PhotoProject>) => {
+    const next = projects.map(project => project.id === id ? { ...project, ...patch, updatedAt: Date.now() } : project);
+    if (persistProjects(next)) setProjects(next);
+    else showToast('Proje bilgileri kaydedilemedi; depolama alanını kontrol et.', 'info');
   };
 
   const openProject = (project: PhotoProject) => {
@@ -276,9 +292,9 @@ export default function App() {
       </button>}
       {!session && view !== 'settings' && <Navigation view={view} onNavigate={setView} onCreate={openPicker} />}
       {!session && <main className={`app-content ${view === 'settings' ? 'app-content--settings' : ''}`}>
-        {view === 'home' && <HomeScreen projects={projects} isPro={isPro} onOpen={openProject} onCreate={openPicker} onCamera={openCamera} onAuto={openAutoEnhance} onPro={() => setPaywallOpen(true)} onProjects={() => setView('projects')} onDiscover={() => setView('discover')} />}
+        {view === 'home' && <HomeScreen projects={projects} isPro={isPro} onOpen={openProject} onCreate={openPicker} onCamera={openCamera} onAuto={openAutoEnhance} onPro={() => setPaywallOpen(true)} onProjects={() => setView('projects')} onDiscover={() => setView('discover')} onCollage={() => setStudio('collage')} onBatch={() => setStudio('batch')} />}
         {view === 'discover' && <DiscoverScreen isPro={isPro} onUsePhoto={importDiscoverPhoto} onCancelImport={cancelImport} onOverlayChange={setDiscoverOverlayOpen} registerCloseHandler={registerDiscoverClose} busy={importing} onPro={() => setPaywallOpen(true)} onNotifications={() => showToast('Karıştır düğmesi her dokunuşta yeni ve gerçek bir seçki getirir.', 'info')} />}
-        {view === 'projects' && <ProjectsScreen projects={projects} isPro={isPro} onOpen={openProject} onCreate={openPicker} onDelete={deleteProject} onPro={() => setPaywallOpen(true)} onNotifications={() => showToast('Projelerin cihazında güvende.', 'info')} />}
+        {view === 'projects' && <ProjectsScreen projects={projects} isPro={isPro} onOpen={openProject} onCreate={openPicker} onDelete={deleteProject} onUpdate={updateProject} onPro={() => setPaywallOpen(true)} onNotifications={() => showToast('Projelerin cihazında güvende.', 'info')} />}
         {view === 'profile' && <ProfileScreen projects={projects} isPro={isPro} onPro={() => setPaywallOpen(true)} onInfo={setInfoTopic} onNotifications={() => showToast('Bildirim tercihlerini profil ayarlarından yönetebilirsin.', 'info')} onRestore={() => { void restore().catch(() => undefined); }} onSettings={() => setView('settings')} />}
         {view === 'settings' && <SettingsScreen preferences={preferences} onChange={updatePreferences} onBack={() => setView('profile')} />}
       </main>}
@@ -287,6 +303,9 @@ export default function App() {
       <input ref={fileInput} className="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => event.target.files?.[0] && handleFileInput(event.target.files[0], event.target)} />
       <input ref={cameraInput} className="visually-hidden" type="file" accept="image/*" capture="environment" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; void importFile(file); }} />
 
+      {onboardingOpen && <Onboarding onComplete={() => { setOnboarded(); setOnboardingOpen(false); }} />}
+      {studio === 'collage' && <CollageStudio onClose={() => setStudio(null)} onToast={showToast} />}
+      {studio === 'batch' && <BatchStudio isPro={isPro} onClose={() => setStudio(null)} onToast={showToast} />}
       {paywallOpen && <Paywall onClose={() => setPaywallOpen(false)} onPurchase={purchase} onRestore={restore} />}
       {infoTopic && <InfoModal topic={infoTopic} onClose={() => setInfoTopic(null)} />}
       {importing && <div className="importing-overlay glass-modal" role="dialog" aria-modal="true" aria-label="Fotoğraf hazırlanıyor"><MyVisionLogo size={58} /><span><LoaderCircle className="spin" size={25} /></span><strong>Fotoğrafın hazırlanıyor</strong><small>Vizyonun birazdan başlıyor…</small><button className="button button--outline import-cancel" onClick={cancelImport}>İptal</button></div>}

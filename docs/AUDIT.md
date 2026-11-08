@@ -58,3 +58,19 @@
 - Android 12+ `windowSplashScreen*`, Android 11 ve altı drawable varyantları; AMOLED/Açık launch temaları eklendi. Uygulama içi geçiş hazır olduktan sonra kapanıyor, dokunmayla geçilebiliyor ve yalnız transform/opacity kullanıyor.
 - Kontrollü Chromium: AMOLED `#000`, Açık `#F3F3EF`, sistem dark/light canlı geçişi, mavi vurgu ve reload kalıcılığı, Sade/blur, splash kapalıyken mount olmama ve 390 px taşma kontrolü geçti.
 - Production build, ESLint, Capacitor sync ve 26 test başarılı. Native derleme ve fiziksel soğuk/sıcak açılış ölçümü bu aşamada yapılmadı.
+
+## Aşama 4 — Cihaz içi yaratıcı araçlar ve arşiv
+
+- Rakip araştırması ve resmî kaynak bağlantıları `docs/RESEARCH.md` içine yazıldı; bulut/ücretli AI veya ağır çalışma zamanı eklenmedi.
+- Serbest normalize kırpma; Story/Post/Kapak oranları; straighten için boş köşe bırakmayan cover ölçeği; yatay/dikey perspektif; Curves; 7 kanal HSL; radyal/lineer seçici maskeler eklendi.
+- Yerel doku harmanlı healing/nesne, kırmızı göz, gürültü azaltma, keskinleştirme, kenar-renk tabanlı arka plan kaldırma eklendi. Arka plan ve nesne araçları klasik algoritmadır; AI olarak sunulmaz.
+- Metin (3 font), taşınabilir çıkartma, gerçek fırça konturları, çerçeve, canlı 48 bölgeli histogram, grid, pinch/button zoom, önce–sonra ve 40 adımlı geri al/yinele birlikte çalışıyor.
+- Portre/Manzara/Yemek/Gece/Vintage dahil 16 hazır görünüm; ayar kopyala/yapıştır ve en fazla 30 kalıcı özel tarif eklendi.
+- Gerçek çoklu dosya Kolaj (Story/Post/Kapak, filtre, aralık, arka plan, başlık) ve Batch (12 dosya, ortak/kopyalanmış ayar, filigran, boyut, gerçek ilerleme ve hata listesi) stüdyoları eklendi.
+- Albüm/favori/etiket proje modeline eklendi; arama bu alanları ve ismi kapsıyor. İlk açılış onboarding’i kalıcı ve geçilebilir.
+- Gelişmiş önizleme düşük çözünürlüklü gerçek render kullanıyor; export aynı motorla kaynak çözünürlüğünde çalışıyor.
+- Mobil tam-ekran araç dock’unun fotoğraf dokunuşlarını kapatması ve gelişmiş preview’ın `left/top:50%` ofseti QA sırasında bulunup düzeltildi.
+- Kontrollü Chromium: Curves/HSL/radyal maske/healing/metin/fırça/free crop/özel tarif/save/export geçti; kayıtta 1 metin, 1 maske, 1 rötuş, 1 kontur, HSL 20 ve `free` doğrulandı; gerçek JPG indirildi.
+- Kolaj çıktısı Sharp ile **1080×1920** doğrulandı; batch iki ayrı JPG üretti; favori/albüm/etiket araması geçti.
+- Regresyon: Noir %85 ve proje kimliği, Discover 503/retry/iptal/Escape/scroll temizliği, EXIF 200×400, dikey ve panorama merkezleme yeniden geçti.
+- Production build, ESLint ve 33 test başarılı. Fiziksel cihaz ölçümü yapılmadı.
