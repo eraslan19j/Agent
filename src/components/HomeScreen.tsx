@@ -1,4 +1,4 @@
-import { ArrowRight, Camera, Folder, ImagePlus, LayoutGrid, ListChecks, ShieldCheck, WandSparkles } from 'lucide-react';
+import { ArrowRight, Camera, Film, Folder, ImagePlus, LayoutGrid, ListChecks, ShieldCheck, WandSparkles } from 'lucide-react';
 import type { PhotoProject } from '../types';
 import { Brand } from './Brand';
 
@@ -11,9 +11,10 @@ interface HomeScreenProps {
   onProjects: () => void;
   onCollage: () => void;
   onBatch: () => void;
+  onVideo: () => void;
 }
 
-export function HomeScreen({ projects, onOpen, onCreate, onCamera, onAuto, onProjects, onCollage, onBatch }: HomeScreenProps) {
+export function HomeScreen({ projects, onOpen, onCreate, onCamera, onAuto, onProjects, onCollage, onBatch, onVideo }: HomeScreenProps) {
   return (
     <div className="screen home-screen page-enter">
       <header className="home-header"><Brand /></header>
@@ -31,6 +32,7 @@ export function HomeScreen({ projects, onOpen, onCreate, onCamera, onAuto, onPro
         <div className="section-heading"><div><span className="eyebrow">ARAÇLAR</span><h2 id="quick-title">Nasıl başlamak istersin?</h2></div></div>
         <div className="quick-grid">
           <button className="quick-card" onClick={onAuto}><WandSparkles size={22} /><span><strong>Otomatik iyileştir</strong><small>Dengeli ışık ve renkle başla</small></span><ArrowRight size={17} /></button>
+          <button className="quick-card" onClick={onVideo}><Film size={22} /><span><strong>Video düzenle</strong><small>Klip, efekt, metin ve MP4</small></span><ArrowRight size={17} /></button>
           <button className="quick-card" onClick={onCollage}><LayoutGrid size={22} /><span><strong>Kolaj oluştur</strong><small>2–6 fotoğrafı bir araya getir</small></span><ArrowRight size={17} /></button>
           <button className="quick-card" onClick={onBatch}><ListChecks size={22} /><span><strong>Toplu işlem</strong><small>Aynı ayarı 12 fotoğrafa uygula</small></span><ArrowRight size={17} /></button>
         </div>

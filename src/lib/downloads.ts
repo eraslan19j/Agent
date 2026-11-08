@@ -12,6 +12,7 @@ export function blobToDataUrl(blob: Blob): Promise<string> {
 }
 
 export async function downloadBlob(blob: Blob, filename: string) {
+  const isVideo = blob.type.startsWith('video/') || filename.toLowerCase().endsWith('.mp4');
   if (Capacitor.isNativePlatform()) {
     const dataUrl = await blobToDataUrl(blob);
     try {
@@ -28,7 +29,7 @@ export async function downloadBlob(blob: Blob, filename: string) {
         data: dataUrl.split(',')[1],
         directory: Directory.Cache,
       });
-      await Share.share({ title: 'My Vision fotoğrafı', url: cached.uri, dialogTitle: 'Fotoğrafı paylaş veya kaydet' });
+      await Share.share({ title: isVideo ? 'My Vision videosu' : 'My Vision fotoğrafı', url: cached.uri, dialogTitle: isVideo ? 'Videoyu paylaş veya kaydet' : 'Fotoğrafı paylaş veya kaydet' });
       return;
     }
   }
@@ -42,22 +43,23 @@ export async function downloadBlob(blob: Blob, filename: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1500);
 }
 
-export async function shareProject(blob: Blob) {
+export async function shareProject(blob: Blob, filename = 'my-vision.jpg') {
+  const isVideo = blob.type.startsWith('video/') || filename.toLowerCase().endsWith('.mp4');
   if (Capacitor.isNativePlatform()) {
     const dataUrl = await blobToDataUrl(blob);
-    const path = `my-vision-share-${Date.now()}.jpg`;
+    const path = `my-vision-share-${Date.now()}-${filename.replace(/[^a-zA-Z0-9._-]/g, '-')}`;
     const cached = await Filesystem.writeFile({ path, data: dataUrl.split(',')[1], directory: Directory.Cache });
     try {
-      await Share.share({ title: 'My Vision', text: 'Görüşünü paylaş.', url: cached.uri, dialogTitle: 'Fotoğrafını paylaş' });
+      await Share.share({ title: 'My Vision', text: 'Görüşünü paylaş.', url: cached.uri, dialogTitle: isVideo ? 'Videonu paylaş' : 'Fotoğrafını paylaş' });
     } finally {
       window.setTimeout(() => { void Filesystem.deleteFile({ path, directory: Directory.Cache }).catch(() => undefined); }, 30000);
     }
     return;
   }
-  const file = new File([blob], 'my-vision.jpg', { type: blob.type });
+  const file = new File([blob], filename, { type: blob.type });
   if (navigator.share && navigator.canShare?.({ files: [file] })) {
     await navigator.share({ files: [file], title: 'My Vision', text: 'Görüşünü paylaş.' });
     return;
   }
-  await downloadBlob(blob, 'my-vision.jpg');
+  await downloadBlob(blob, filename);
 }

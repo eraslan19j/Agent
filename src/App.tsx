@@ -13,6 +13,7 @@ import { CollageStudio } from './components/CollageStudio';
 import { BatchStudio } from './components/BatchStudio';
 import { Onboarding } from './components/Onboarding';
 import { PhotoEditor } from './components/PhotoEditor';
+import { VideoEditor } from './components/VideoEditor';
 import { InfoModal } from './components/InfoModal';
 import { MyVisionLogo } from './components/MyVisionLogo';
 import { Toast } from './components/Toast';
@@ -31,6 +32,7 @@ export default function App() {
   const [storageStatus, setStorageStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [session, setSession] = useState<EditorSession | null>(null);
   const [studio, setStudio] = useState<'collage' | 'batch' | null>(null);
+  const [videoOpen, setVideoOpen] = useState(false);
   const [onboardingOpen, setOnboardingOpen] = useState(() => !hasOnboarded());
   const [infoTopic, setInfoTopic] = useState<InfoTopic | null>(null);
   const [importing, setImporting] = useState(false);
@@ -139,20 +141,21 @@ export default function App() {
       else if (importing) cancelImport();
       else if (studio) setStudio(null);
       else if (session) { /* PhotoEditor owns the dirty-close confirmation flow. */ }
+      else if (videoOpen) { /* VideoEditor owns the dirty-close confirmation flow. */ }
       else if (view === 'settings') setView('profile');
       else if (view !== 'home') setView('home');
       else void CapacitorApp.exitApp();
     });
     return () => { void listener.then((handle) => handle.remove()); };
-  }, [onboardingOpen, infoTopic, importing, studio, session, view, cancelImport]);
+  }, [onboardingOpen, infoTopic, importing, studio, session, videoOpen, view, cancelImport]);
 
   useEffect(() => {
     window.scrollTo(0, 0);
-    if (!session && !importing && !studio) return;
+    if (!session && !importing && !studio && !videoOpen) return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = previousOverflow; };
-  }, [session, importing, studio]);
+  }, [session, importing, studio, videoOpen]);
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
@@ -236,12 +239,13 @@ export default function App() {
     <div className="app-shell">
       {!session && view !== 'settings' && <Navigation view={view} onNavigate={setView} onCreate={openPicker} />}
       {!session && <main className={`app-content ${view === 'settings' ? 'app-content--settings' : ''}`}>
-        {view === 'home' && <HomeScreen projects={projects} onOpen={openProject} onCreate={openPicker} onCamera={openCamera} onAuto={openAutoEnhance} onProjects={() => setView('projects')} onCollage={() => setStudio('collage')} onBatch={() => setStudio('batch')} />}
+        {view === 'home' && <HomeScreen projects={projects} onOpen={openProject} onCreate={openPicker} onCamera={openCamera} onAuto={openAutoEnhance} onProjects={() => setView('projects')} onCollage={() => setStudio('collage')} onBatch={() => setStudio('batch')} onVideo={() => setVideoOpen(true)} />}
         {view === 'projects' && <ProjectsScreen projects={projects} onOpen={openProject} onCreate={openPicker} onDelete={deleteProject} onUpdate={updateProject} />}
         {view === 'profile' && <ProfileScreen projects={projects} onInfo={setInfoTopic} onSettings={() => setView('settings')} />}
         {view === 'settings' && <SettingsScreen preferences={preferences} onChange={setPreferences} onBack={() => setView('profile')} />}
       </main>}
       {session && <PhotoEditor session={session} onClose={closeEditor} onSave={saveProject} onToast={showToast} />}
+      {videoOpen && <VideoEditor onClose={() => setVideoOpen(false)} onToast={showToast} />}
 
       <input ref={fileInput} className="visually-hidden" type="file" aria-label="Galeriden fotoğraf seç" accept="image/jpeg,image/png,image/webp" onChange={(event) => handleFileInput(event.target.files?.[0], event.target)} />
       <input ref={cameraInput} className="visually-hidden" type="file" aria-label="Kamera ile fotoğraf çek" accept="image/*" capture="environment" onChange={(event) => handleFileInput(event.target.files?.[0], event.target)} />
