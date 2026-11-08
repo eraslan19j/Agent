@@ -8,6 +8,8 @@ on:
     paths:
       - 'src/**'
       - 'public/**'
+      - 'qa/**'
+      - 'scripts/**'
       - 'android/**'
       - 'package.json'
       - 'package-lock.json'

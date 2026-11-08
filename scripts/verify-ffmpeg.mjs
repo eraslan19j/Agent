@@ -30,12 +30,17 @@ if (!address || typeof address === 'string') throw new Error('Test server could 
 const origin = `http://127.0.0.1:${address.port}`;
 let browser;
 try {
-  chromium.setGraphicsMode = false;
-  if (existsSync('/tmp/al2023/lib')) process.env.LD_LIBRARY_PATH = `/tmp/al2023/lib${process.env.LD_LIBRARY_PATH ? `:${process.env.LD_LIBRARY_PATH}` : ''}`;
+  const systemChrome = ['/usr/bin/google-chrome', '/opt/google/chrome/chrome', '/usr/bin/chromium'].find(existsSync);
+  const executablePath = process.env.CHROME_BIN || systemChrome || await chromium.executablePath();
+  const packagedChromium = !process.env.CHROME_BIN && !systemChrome;
+  if (packagedChromium) chromium.setGraphicsMode = false;
+  if (packagedChromium && existsSync('/tmp/al2023/lib')) process.env.LD_LIBRARY_PATH = `/tmp/al2023/lib${process.env.LD_LIBRARY_PATH ? `:${process.env.LD_LIBRARY_PATH}` : ''}`;
   browser = await puppeteer.launch({
-    executablePath: process.env.CHROME_BIN || await chromium.executablePath(),
+    executablePath,
     headless: true,
-    args: [...chromium.args.filter(argument => argument !== '--disable-web-security'), '--no-sandbox'],
+    args: packagedChromium
+      ? [...chromium.args.filter(argument => argument !== '--disable-web-security'), '--no-sandbox']
+      : ['--no-sandbox', '--disable-dev-shm-usage'],
   });
   const page = await browser.newPage();
   const browserErrors = [];
