@@ -91,3 +91,7 @@ Tarih: 7 Kasım 2026. Bu rapor uygulama kodu değiştirilmeden önce hazırland�
 5. Eski worker sonucu yeni ayarların üzerine çıkmamalı; iptalde worker sonlanmalı.
 6. Mevcut 40 birim + 10 browser kontrolü, yeni testler, lint, strict TypeScript, production build ve Android CI geçmeli.
 7. Fiziksel cihaz performansı ve native yaşam döngüsü ayrıca elle raporlanmalı; browser kanıtı bunların yerine sunulmamalı.
+
+## Uygulama sonrası doğrulama
+
+Düzeltmelerin kapsamı, 44 birim + 23 Chromium kontrolü, önce/sonra ekran kanıtları ve hâlâ açık fiziksel cihaz kapıları için bkz. [`PHASE1_VERIFICATION.md`](./PHASE1_VERIFICATION.md).

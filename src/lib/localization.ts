@@ -178,6 +178,28 @@ const pairs: [string, string][] = [
   ['Gizlilik','Privacy'],
   ['Editörden çık','Leave editor'],
   ['Proje adı','Project name'],
+  ['Kaydedildi','Saved'],
+  ['Kaydedilmedi','Unsaved'],
+  ['Kaydedilmemiş değişiklikler var','There are unsaved changes'],
+  ['Değişiklikler kaydedildi','Changes saved'],
+  ['Projeyi cihazına kaydet','Save project on this device'],
+  ['JPG veya PNG olarak dışa aktar','Export as JPG or PNG'],
+  ['Önce ve sonra','Before and after'],
+  ['Orijinali görmek için basılı tut','Press and hold to see the original'],
+  ['Düzenleme panelini kapat','Close editing panel'],
+  ['Düzenleme panelini aç','Open editing panel'],
+  ['Paneli kapat','Close panel'],
+  ['Paneli aç','Open panel'],
+  ['Orijinal fotoğraf','Original photo'],
+  ['Gerçek çıktı önizlemesi','Actual output preview'],
+  ['Önizleme hazırlanıyor','Preparing preview'],
+  ['Dışa aktarılacak fotoğrafın gerçek önizlemesi','Actual preview of the photo to export'],
+  ['Kaydedilmemiş değişiklikler','Unsaved changes'],
+  ['Bu projede kaydedilmemiş değişiklikler var. Çıkarsan son değişiklikler kaybolacak.','This project has unsaved changes. If you leave, your latest edits will be lost.'],
+  ['Düzenlemeye dön','Return to editing'],
+  ['Kaydetmeden çık','Leave without saving'],
+  ['Kaydet ve çık','Save and leave'],
+  ['Kayıt tamamlandı; son değişiklikleri yeniden kaydet.','Save complete; save again to keep your latest changes.'],
   ['CANLI ÖNİZLEME','LIVE PREVIEW'],
   ['Önce / Sonra','Before / After'],
   ['Düzenlenen fotoğraf','Edited photo'],
@@ -364,7 +386,7 @@ function localizeText(node: Text) {
   node.data = raw.replace(trimmed, translated);
 }
 function localizeElement(element: Element) {
-  for (const name of ['aria-label','title','placeholder','alt']) {
+  for (const name of ['aria-label','title','placeholder','alt','data-tooltip']) {
     const value = element.getAttribute(name); if (!value) continue;
     const originals = originalAttributes.get(element) ?? new Map<string,string>();
     if (language === 'tr') { const original = originals.get(name); if (original && value !== original) element.setAttribute(name, original); }
@@ -385,6 +407,6 @@ export function setLocalizationLanguage(next: UiLanguage) { language = next; doc
 export function startLocalization(initial: UiLanguage) {
   language = initial; document.documentElement.lang = initial; walk(document.body);
   observer = new MutationObserver(records => { for (const record of records) { if (record.type === 'characterData' && record.target instanceof Text) localizeText(record.target); record.addedNodes.forEach(walk); if (record.type === 'attributes') walk(record.target); } });
-  observer.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['aria-label','title','placeholder','alt','href'] });
+  observer.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['aria-label','title','placeholder','alt','data-tooltip','href'] });
   return () => observer?.disconnect();
 }

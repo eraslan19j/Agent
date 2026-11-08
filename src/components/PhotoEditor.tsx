@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft, Check, CircleGauge, Columns2, Contrast, Crop, Download, Eye, Focus,
   FlipHorizontal2, FlipVertical2, Grid3X3, Image as ImageIcon, LoaderCircle,
   Redo2, RotateCcw, RotateCw, Save, Share2, SlidersHorizontal,
   Sparkles, Sun, Thermometer, Undo2, WandSparkles, Waves, Palette, Type,
-  ZoomIn, ZoomOut, Copy, Clipboard, Plus, Trash2, BarChart3,
+  ZoomIn, ZoomOut, Copy, Clipboard, Plus, Trash2, BarChart3, PanelBottomClose, PanelBottomOpen,
 } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
+import { App as CapacitorApp } from '@capacitor/app';
 import { AUTO_ENHANCE_SETTINGS, getPreset, PRESETS } from '../data/presets';
 import { buildCssFilter, canvasBackingSize, computeSettingsCrop, createThumbnail, freshSettings, hasAdvancedRendering, loadImage, outputDimensions, previewDimensions, renderPhoto } from '../lib/imageEngine';
 import { copySettings, deleteRecipe, loadRecipes, pasteSettings, saveRecipe, type CustomRecipe } from '../lib/recipes';
@@ -63,12 +65,18 @@ export function PhotoEditor({ session, onClose, onSave, onToast }: PhotoEditorPr
   const [activeTab, setActiveTab] = useState<EditorTab>('looks');
   const [name, setName] = useState(session.name);
   const [projectId, setProjectId] = useState(session.projectId);
+  const [savedSnapshot, setSavedSnapshot] = useState<string | null>(() => session.projectId ? JSON.stringify({ name: session.name, settings }) : null);
   const [compare, setCompare] = useState(false);
   const [showOriginal, setShowOriginal] = useState(false);
   const [comparePosition, setComparePosition] = useState(50);
   const [showGrid, setShowGrid] = useState(false);
   const [showHistogram, setShowHistogram] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [exportPreview, setExportPreview] = useState<string | null>(null);
+  const [panelOpen, setPanelOpen] = useState(true);
+  const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
+  const [originalHintUses, setOriginalHintUses] = useState(() => Number(localStorage.getItem('myvision.original-hints.v1') || 0));
+  const [tooltip, setTooltip] = useState<{ text: string; x: number; y: number } | null>(null);
   const [exportOptions, setExportOptions] = useState<ExportOptions>({ format: 'jpeg', quality: 0.92, maxDimension: 2048 });
   const [busy, setBusy] = useState<'save' | 'export' | 'share' | null>(null);
   const [imageSize, setImageSize] = useState({ width: session.width ?? 0, height: session.height ?? 0 });
@@ -83,6 +91,7 @@ export function PhotoEditor({ session, onClose, onSave, onToast }: PhotoEditorPr
   const [recipes, setRecipes] = useState<CustomRecipe[]>(() => loadRecipes());
   const [recipeName, setRecipeName] = useState('');
   const sliderStart = useRef<EditSettings | null>(null);
+  const tooltipTimer = useRef<number | null>(null);
   const settingsFrame = useRef<number | null>(null);
   const queuedSettings = useRef<EditSettings | null>(null);
   const layerGesture = useRef<{ kind: 'text' | 'mask'; id: string; rect: DOMRect } | null>(null);
@@ -94,6 +103,11 @@ export function PhotoEditor({ session, onClose, onSave, onToast }: PhotoEditorPr
   const filter = useMemo(() => buildCssFilter(settings), [settings]);
   const isQuarterTurn = settings.rotation % 180 !== 0;
   const advanced = hasAdvancedRendering(settings);
+  const currentSnapshot = JSON.stringify({ name: name.trim() || 'Adsız proje', settings });
+  const dirty = !projectId || currentSnapshot !== savedSnapshot;
+  const latestSnapshot = useRef(currentSnapshot);
+
+  useEffect(() => { latestSnapshot.current = currentSnapshot; }, [currentSnapshot]);
 
   useEffect(() => {
     if (session.width && session.height) return;
@@ -149,7 +163,20 @@ export function PhotoEditor({ session, onClose, onSave, onToast }: PhotoEditorPr
   }, [advanced, settings, previewSource, imageSize.width, imageSize.height, stageBounds.width, stageBounds.height, onToast]);
 
   useEffect(() => () => { if (advancedPreview) URL.revokeObjectURL(advancedPreview); }, [advancedPreview]);
-  useEffect(() => () => { if (settingsFrame.current !== null) cancelAnimationFrame(settingsFrame.current); }, []);
+  useEffect(() => () => { if (exportPreview) URL.revokeObjectURL(exportPreview); }, [exportPreview]);
+  useEffect(() => {
+    if (!exportOpen) return;
+    let active = true;
+    const controller = new AbortController();
+    void renderPhoto(previewSource, settings, { format: 'jpeg', quality: .86, maxDimension: 1000, signal: controller.signal }).then(blob => {
+      if (active) setExportPreview(URL.createObjectURL(blob));
+    }).catch(() => undefined);
+    return () => { active = false; controller.abort(); };
+  }, [exportOpen, previewSource, settings]);
+  useEffect(() => () => {
+    if (settingsFrame.current !== null) cancelAnimationFrame(settingsFrame.current);
+    if (tooltipTimer.current !== null) window.clearTimeout(tooltipTimer.current);
+  }, []);
 
   const cancelQueuedSettings = () => {
     if (settingsFrame.current !== null) cancelAnimationFrame(settingsFrame.current);
@@ -171,11 +198,13 @@ export function PhotoEditor({ session, onClose, onSave, onToast }: PhotoEditorPr
     });
   };
 
-  const commit = (patch: Partial<EditSettings>, base?: EditSettings) => {
+  const commit = (patch: Partial<EditSettings> | ((current: EditSettings) => Partial<EditSettings>), base?: EditSettings) => {
+    const current = queuedSettings.current ?? settings;
     cancelQueuedSettings();
-    setHistory((items) => [...items.slice(-39), base || settings]);
+    const resolved = typeof patch === 'function' ? patch(current) : patch;
+    setHistory((items) => [...items.slice(-39), base || current]);
     setFuture([]);
-    setSettings((current) => ({ ...current, ...patch }));
+    setSettings({ ...current, ...resolved });
   };
 
   const updateSlider = (key: keyof EditSettings, value: number) => {
@@ -192,7 +221,13 @@ export function PhotoEditor({ session, onClose, onSave, onToast }: PhotoEditorPr
     }
   };
 
-  const startHistory = () => { if (!sliderStart.current) sliderStart.current = settings; };
+  const startHistory = () => {
+    if (sliderStart.current) return;
+    const current = queuedSettings.current ?? settings;
+    cancelQueuedSettings();
+    if (current !== settings) setSettings(current);
+    sliderStart.current = current;
+  };
   const live = (patch: Partial<EditSettings>) => queueSettings(current => ({ ...current, ...patch }));
   const liveSettings = (updater: (current: EditSettings) => EditSettings) => queueSettings(updater);
 
@@ -230,26 +265,36 @@ export function PhotoEditor({ session, onClose, onSave, onToast }: PhotoEditorPr
     onToast(presetId === 'original' ? 'Temel görünüme dönüldü.' : `${preset.name} fotoğrafına uygulandı.`);
   };
 
-  const save = async () => {
+  const save = async (): Promise<boolean> => {
+    const settingsToSave = queuedSettings.current ?? settings;
+    const savedName = name.trim() || 'Adsız proje';
+    const snapshotToSave = JSON.stringify({ name: savedName, settings: settingsToSave });
+    cancelQueuedSettings();
+    if (settingsToSave !== settings) setSettings(settingsToSave);
     setBusy('save');
     try {
-      const thumbnail = await createThumbnail(previewSource, settings);
+      const thumbnail = await createThumbnail(previewSource, settingsToSave);
       const saved = await onSave({
         id: projectId || crypto.randomUUID(),
-        name: name.trim() || 'Adsız proje',
+        name: savedName,
         source: session.source,
         previewSource,
         width: imageSize.width,
         height: imageSize.height,
         thumbnail,
-        settings,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
+        settings: settingsToSave,
+        // The persistence owner assigns authoritative created/updated timestamps.
+        createdAt: 0,
+        updatedAt: 0,
       });
       setProjectId(saved.id);
-      onToast('Proje cihazına kaydedildi.');
+      setSavedSnapshot(snapshotToSave);
+      const isCurrent = latestSnapshot.current === snapshotToSave;
+      onToast(isCurrent ? 'Proje cihazına kaydedildi.' : 'Kayıt tamamlandı; son değişiklikleri yeniden kaydet.', isCurrent ? 'success' : 'info');
+      return isCurrent;
     } catch (reason) {
       onToast(reason instanceof Error ? reason.message : 'Proje kaydedilemedi.', 'info');
+      return false;
     } finally { setBusy(null); }
   };
 
@@ -260,6 +305,7 @@ export function PhotoEditor({ session, onClose, onSave, onToast }: PhotoEditorPr
       const safeName = (name.trim() || 'my-vision').toLocaleLowerCase('tr').replace(/[^a-z0-9ğüşöçıİĞÜŞÖÇ]+/gi, '-').replace(/İ/g, 'i');
       await downloadBlob(blob, `${safeName}.${exportOptions.format === 'jpeg' ? 'jpg' : 'png'}`);
       setExportOpen(false);
+      setExportPreview(null);
       onToast('Fotoğrafın hazır. Harika görünüyor!');
     } catch (reason) {
       onToast(reason instanceof Error ? reason.message : 'Dışa aktarma tamamlanamadı.', 'info');
@@ -275,6 +321,28 @@ export function PhotoEditor({ session, onClose, onSave, onToast }: PhotoEditorPr
       if (reason instanceof Error && reason.name !== 'AbortError') onToast('Paylaşım başlatılamadı.', 'info');
     } finally { setBusy(null); }
   };
+
+  const requestClose = useCallback(() => {
+    if (closeConfirmOpen) { if (busy === null) setCloseConfirmOpen(false); return; }
+    if (busy !== null) return;
+    if (freeCropOpen) { setFreeCropOpen(false); return; }
+    if (exportOpen) { setExportOpen(false); setExportPreview(null); return; }
+    if (dirty) setCloseConfirmOpen(true);
+    else onClose();
+  }, [closeConfirmOpen, freeCropOpen, exportOpen, busy, dirty, onClose]);
+
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [dirty]);
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    const listener = CapacitorApp.addListener('backButton', requestClose);
+    return () => { void listener.then(handle => handle.remove()); };
+  }, [requestClose]);
 
   const normalizedPoint = (event: React.PointerEvent, rect: DOMRect) => ({
     x: Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)),
@@ -319,6 +387,31 @@ export function PhotoEditor({ session, onClose, onSave, onToast }: PhotoEditorPr
   };
   const pinchUp = (event: React.PointerEvent) => { touchPoints.current.delete(event.pointerId); if (touchPoints.current.size < 2) pinchStart.current = null; };
 
+  const startOriginal = (event: React.PointerEvent) => {
+    event.preventDefault(); setShowOriginal(true);
+    setOriginalHintUses(current => {
+      const next = Math.min(3, current + 1);
+      try { localStorage.setItem('myvision.original-hints.v1', String(next)); } catch { /* Private storage may be unavailable. */ }
+      return next;
+    });
+  };
+  const hideTooltip = () => {
+    if (tooltipTimer.current !== null) window.clearTimeout(tooltipTimer.current);
+    tooltipTimer.current = null; setTooltip(null);
+  };
+  const startTooltip = (event: React.PointerEvent) => {
+    const button = (event.target as Element).closest<HTMLButtonElement>('button[data-tooltip]');
+    if (!button) return;
+    hideTooltip();
+    const text = button.dataset.tooltip!;
+    const rect = button.getBoundingClientRect();
+    tooltipTimer.current = window.setTimeout(() => setTooltip({
+      text,
+      x: Math.max(88, Math.min(window.innerWidth - 88, rect.left + rect.width / 2)),
+      y: rect.bottom + 46 > window.innerHeight ? rect.top - 40 : rect.bottom + 8,
+    }), 520);
+  };
+
   const output = imageSize.width ? outputDimensions(imageSize.width, imageSize.height, settings, exportOptions.maxDimension) : null;
   const preview = previewDimensions(stageBounds.width, stageBounds.height, imageSize.width, imageSize.height, settings);
   const previewImageWidth = isQuarterTurn ? preview.height : preview.width;
@@ -337,18 +430,18 @@ export function PhotoEditor({ session, onClose, onSave, onToast }: PhotoEditorPr
   const advancedImageStyle: React.CSSProperties = { left: 0, top: 0, width: '100%', height: '100%', objectFit: 'contain', transform: 'none' };
 
   return (
-    <div className="editor-shell">
+    <div className="editor-shell" onPointerOverCapture={startTooltip} onPointerOutCapture={hideTooltip} onPointerDownCapture={startTooltip} onPointerUpCapture={hideTooltip} onPointerCancelCapture={hideTooltip} onScrollCapture={hideTooltip}>
       <header className="editor-header">
-        <div className="editor-header__left"><button className="icon-button" onClick={onClose} aria-label="Editörden çık"><ArrowLeft size={21} /></button><span className="editor-brand"><Brand compact /></span><span className="editor-divider" /><input className="project-name-input" value={name} onChange={(event) => setName(event.target.value)} aria-label="Proje adı" maxLength={48} /></div>
-        <div className="editor-header__center"><button className="icon-button" onClick={undo} disabled={!history.length} aria-label="Geri al"><Undo2 size={19} /></button><button className="icon-button" onClick={redo} disabled={!future.length} aria-label="Yinele"><Redo2 size={19} /></button></div>
-        <div className="editor-header__actions"><button className="button button--ghost editor-save" aria-label="Kaydet" onClick={() => void save()} disabled={busy !== null}>{busy === 'save' ? <LoaderCircle className="spin" size={17} /> : <Save size={17} />}<span>Kaydet</span></button><button className="button button--lime button--small" aria-label="Dışa aktar" onClick={() => setExportOpen(true)}><Download size={17} /><span>Dışa aktar</span></button></div>
+        <div className="editor-header__left"><button className="icon-button" onClick={requestClose} aria-label="Editörden çık" data-tooltip="Editörden çık" title="Editörden çık"><ArrowLeft size={21} /></button><span className="editor-brand"><Brand compact /></span><span className="editor-divider" /><input className="project-name-input" value={name} onChange={(event) => setName(event.target.value)} aria-label="Proje adı" maxLength={48} /></div>
+        <div className="editor-header__center"><button className="icon-button" onClick={undo} disabled={!history.length} aria-label="Geri al" data-tooltip="Geri al" title="Geri al"><Undo2 size={19} /></button><button className="icon-button" onClick={redo} disabled={!future.length} aria-label="Yinele" data-tooltip="Yinele" title="Yinele"><Redo2 size={19} /></button></div>
+        <div className="editor-header__actions"><span className={`save-state ${dirty ? 'is-dirty' : ''}`} aria-live="polite" title={dirty ? 'Kaydedilmemiş değişiklikler var' : 'Değişiklikler kaydedildi'}><i /><span>{dirty ? 'Kaydedilmedi' : 'Kaydedildi'}</span></span><button className="button button--ghost editor-save" aria-label="Kaydet" data-tooltip="Projeyi cihazına kaydet" title="Projeyi cihazına kaydet" onClick={() => void save()} disabled={busy !== null}>{busy === 'save' ? <LoaderCircle className="spin" size={17} /> : <Save size={17} />}<span>Kaydet</span></button><button className="button button--lime button--small" aria-label="Dışa aktar" data-tooltip="JPG veya PNG olarak dışa aktar" title="JPG veya PNG olarak dışa aktar" onClick={() => { setExportPreview(null); setExportOpen(true); }} disabled={busy !== null}><Download size={17} /><span>Dışa aktar</span></button></div>
       </header>
 
       <main className="editor-workspace">
         <section className="canvas-panel">
           <div className="canvas-toolbar">
             <span className="canvas-label"><i /> CANLI ÖNİZLEME</span>
-            <div><button className={compare ? 'tool-button active' : 'tool-button'} onClick={() => { setCompare(!compare); setShowOriginal(false); }}><Columns2 size={16} /> <span>Önce / Sonra</span></button><button className={showHistogram ? 'tool-button active' : 'tool-button'} onClick={() => setShowHistogram(!showHistogram)} aria-label="Histogram"><BarChart3 size={17} /></button><button className={showGrid ? 'tool-button active' : 'tool-button'} onClick={() => setShowGrid(!showGrid)} aria-label="Izgara"><Grid3X3 size={17} /></button><button className="tool-button" onClick={share} disabled={busy !== null} aria-label="Paylaş">{busy === 'share' ? <LoaderCircle className="spin" size={17} /> : <Share2 size={17} />}</button></div>
+            <div><button className={compare ? 'tool-button active' : 'tool-button'} onClick={() => { setCompare(!compare); setShowOriginal(false); }} aria-label="Önce ve sonra" data-tooltip="Önce ve sonra" title="Önce ve sonra"><Columns2 size={16} /> <span>Önce / Sonra</span></button><button className={showOriginal ? 'tool-button active' : 'tool-button'} onPointerDown={startOriginal} onPointerUp={() => setShowOriginal(false)} onPointerLeave={() => setShowOriginal(false)} onContextMenu={event => event.preventDefault()} aria-label="Orijinali görmek için basılı tut" data-tooltip="Basılı tut: Orijinal" title="Basılı tut: Orijinal"><Eye size={17} /></button><button className={showHistogram ? 'tool-button active' : 'tool-button'} onClick={() => setShowHistogram(!showHistogram)} aria-label="Histogram" data-tooltip="Histogram" title="Histogram"><BarChart3 size={17} /></button><button className={showGrid ? 'tool-button active' : 'tool-button'} onClick={() => setShowGrid(!showGrid)} aria-label="Izgara" data-tooltip="Izgara" title="Izgara"><Grid3X3 size={17} /></button><button className="tool-button" onClick={share} disabled={busy !== null} aria-label="Paylaş" data-tooltip="Paylaş" title="Paylaş">{busy === 'share' ? <LoaderCircle className="spin" size={17} /> : <Share2 size={17} />}</button><button className="tool-button" onClick={() => setPanelOpen(current => !current)} aria-label={panelOpen ? 'Düzenleme panelini kapat' : 'Düzenleme panelini aç'} aria-expanded={panelOpen} aria-controls="editor-panel" data-tooltip={panelOpen ? 'Paneli kapat' : 'Paneli aç'} title={panelOpen ? 'Paneli kapat' : 'Paneli aç'}>{panelOpen ? <PanelBottomClose size={17} /> : <PanelBottomOpen size={17} />}</button></div>
           </div>
           <div className="canvas-stage" ref={stageContainerRef} onPointerDown={pinchDown} onPointerMove={pinchMove} onPointerUp={pinchUp} onPointerCancel={pinchUp}>
             <div className={`photo-stage ${interactionTool !== 'none' ? 'photo-stage--interactive' : ''}`} style={{ width: preview.width || '100%', height: preview.height || '100%', aspectRatio: preview.aspectRatio, transform: `scale(${zoom})` }}>
@@ -360,18 +453,17 @@ export function PhotoEditor({ session, onClose, onSave, onToast }: PhotoEditorPr
               {!advanced && settings.grain > 0 && !showOriginal && <div className="grain-overlay" style={{ opacity: Math.min(0.65, settings.grain / 140) }} />}
               {settings.masks.map(mask => <div key={mask.id} className={`mask-marker mask-marker--${mask.type}`} style={{ left: `${mask.x * 100}%`, top: `${mask.y * 100}%`, width: `${mask.radius * 200}%`, aspectRatio: mask.type === 'radial' ? 1 : '1 / 5', transform: `translate(-50%,-50%) rotate(${mask.angle}deg)` }} onPointerDown={event => startLayerDrag(event, 'mask', mask.id)} onPointerMove={moveLayer} onPointerUp={endLayerDrag} onPointerCancel={endLayerDrag} />)}
               {settings.texts.map(layer => <div key={layer.id} className="design-layer design-text" style={{ left: `${layer.x * 100}%`, top: `${layer.y * 100}%`, maxWidth: `${textAvailableRatio(layer) * 100}%`, color: layer.color, fontFamily: layer.font === 'serif' ? 'ui-serif, Georgia, serif' : layer.font === 'mono' ? 'ui-monospace, monospace' : 'inherit', fontSize: `${Math.max(10, layer.size / 550 * Math.min(preview.width, preview.height))}px`, transform: `translate(${layer.align === 'left' ? '0' : layer.align === 'right' ? '-100%' : '-50%'},-50%) rotate(${layer.rotation}deg)`, textAlign: layer.align }} onPointerDown={event => startLayerDrag(event, 'text', layer.id)} onPointerMove={moveLayer} onPointerUp={endLayerDrag} onPointerCancel={endLayerDrag}><span style={{ opacity: previewBusy || !advancedPreview ? 1 : 0 }}>{layer.text}</span></div>) }
-              {!compare && <button className={`original-hold ${showOriginal ? 'active' : ''}`} onPointerDown={(event) => { event.preventDefault(); setShowOriginal(true); }} onPointerUp={() => setShowOriginal(false)} onPointerLeave={() => setShowOriginal(false)} onContextMenu={(event) => event.preventDefault()} aria-label="Orijinal fotoğrafı görmek için basılı tut"><Eye size={14} /><span>{showOriginal ? 'ORİJİNAL' : 'Basılı tut: Orijinal'}</span></button>}
               {showGrid && <div className="composition-grid"><i /><i /><i /><i /></div>}
               {compare && <><span className="compare-label compare-label--before">ÖNCE</span><span className="compare-label compare-label--after">SONRA</span><div className="compare-line" style={{ left: `${comparePosition}%` }}><span><Columns2 size={16} /></span></div><input className="compare-range" type="range" min="0" max="100" value={comparePosition} onChange={(event) => setComparePosition(Number(event.target.value))} aria-label="Önce ve sonra karşılaştırması" /></>}
-              <span className="preset-indicator">{currentPreset.name}{settings.intensity > 0 && currentPreset.id !== 'original' ? ` · ${settings.intensity}%` : ''}</span>
               {previewBusy && advanced && <span className="advanced-preview-status"><LoaderCircle className="spin" size={12} /> Önizleme</span>}
               {showHistogram && <PhotoHistogram source={previewSource} settings={settings} />}
             </div>
           </div>
-          <div className="canvas-footer"><span>{imageSize.width ? `${imageSize.width} × ${imageSize.height} px` : 'Fotoğraf hazırlanıyor…'}</span><div className="zoom-controls"><button onClick={() => setZoom(value => Math.max(1, value - .25))} disabled={zoom <= 1} aria-label="Uzaklaştır"><ZoomOut size={15} /></button><span>{Math.round(zoom * 100)}%</span><button onClick={() => setZoom(value => Math.min(4, value + .25))} disabled={zoom >= 4} aria-label="Yakınlaştır"><ZoomIn size={15} /></button></div><button onClick={() => { commit(freshSettings()); setAdvancedPreview(null); onToast('Tüm ayarlar sıfırlandı.', 'info'); }}><RotateCcw size={14} /> Sıfırla</button></div>
+          <div className="canvas-status" aria-live="polite"><span className="canvas-chip">{showOriginal ? 'Orijinal fotoğraf' : originalHintUses < 3 ? 'Basılı tut: Orijinal' : `${currentPreset.name}${settings.intensity > 0 && currentPreset.id !== 'original' ? ` · ${settings.intensity}%` : ''}`}</span></div>
+          <div className="canvas-footer"><span>{imageSize.width ? `${imageSize.width} × ${imageSize.height} px` : 'Fotoğraf hazırlanıyor…'}</span><div className="zoom-controls"><button onClick={() => setZoom(value => Math.max(1, value - .25))} disabled={zoom <= 1} aria-label="Uzaklaştır" data-tooltip="Uzaklaştır" title="Uzaklaştır"><ZoomOut size={15} /></button><span>{Math.round(zoom * 100)}%</span><button onClick={() => setZoom(value => Math.min(4, value + .25))} disabled={zoom >= 4} aria-label="Yakınlaştır" data-tooltip="Yakınlaştır" title="Yakınlaştır"><ZoomIn size={15} /></button></div><button onClick={() => { commit(freshSettings()); setAdvancedPreview(null); onToast('Tüm ayarlar sıfırlandı.', 'info'); }}><RotateCcw size={14} /> Sıfırla</button></div>
         </section>
 
-        <aside className="editor-panel">
+        <aside id="editor-panel" className="editor-panel" hidden={!panelOpen}>
           <div className="editor-tabs" role="tablist">
             <button role="tab" aria-selected={activeTab === 'looks'} className={activeTab === 'looks' ? 'active' : ''} onClick={() => setActiveTab('looks')}><WandSparkles size={18} /><span>Görünümler</span></button>
             <button role="tab" aria-selected={activeTab === 'adjust'} className={activeTab === 'adjust' ? 'active' : ''} onClick={() => setActiveTab('adjust')}><SlidersHorizontal size={18} /><span>Ayarlar</span></button>
@@ -382,12 +474,12 @@ export function PhotoEditor({ session, onClose, onSave, onToast }: PhotoEditorPr
           <div className="editor-panel__content">
             {activeTab === 'looks' && <div className="looks-panel">
               <div className="panel-heading"><div><span className="eyebrow">İMZA KOLEKSİYONU</span><h3>Görünümünü seç</h3></div><span>{PRESETS.length} stil</span></div>
+              {settings.presetId !== 'original' && <div className="intensity-control"><EditorSlider label="Görünüm yoğunluğu" value={settings.intensity} min={0} max={100} onChange={(value) => updateSlider('intensity', value)} onStart={() => { sliderStart.current = settings; }} onEnd={endSlider} onReset={() => commit({ intensity: 100 })} /></div>}
               <div className="editor-presets">
                 {PRESETS.map((preset) => <button key={preset.id} className={settings.presetId === preset.id ? 'editor-preset active' : 'editor-preset'} onClick={(event) => { selectPreset(preset.id); event.currentTarget.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' }); }}>
                   <div><img src={previewSource} alt={`${preset.name} önizlemesi`} style={{ filter: buildCssFilter({ ...freshSettings(), presetId: preset.id, intensity: 85 }) }} />{settings.presetId === preset.id && <span className="preset-check"><Check size={13} /></span>}</div><span>{preset.name}</span>
                 </button>)}
               </div>
-              {settings.presetId !== 'original' && <div className="intensity-control"><EditorSlider label="Görünüm yoğunluğu" value={settings.intensity} min={0} max={100} onChange={(value) => updateSlider('intensity', value)} onStart={() => { sliderStart.current = settings; }} onEnd={endSlider} onReset={() => commit({ intensity: 100 })} /></div>}
               <div className="recipe-tools"><div className="recipe-actions"><button onClick={() => { copySettings(settings); onToast('Düzenleme ayarları kopyalandı.'); }}><Copy size={14} /> Ayarları kopyala</button><button onClick={() => { const pasted = pasteSettings(); if (pasted) { commit(pasted); onToast('Kopyalanan ayarlar uygulandı.'); } else onToast('Kopyalanmış ayar bulunamadı.', 'info'); }}><Clipboard size={14} /> Yapıştır</button></div><div className="recipe-save"><input value={recipeName} onChange={event => setRecipeName(event.target.value)} maxLength={32} placeholder="Özel tarif adı" aria-label="Özel tarif adı" /><button onClick={() => { if (!recipeName.trim()) return; try { setRecipes(saveRecipe(recipeName, settings)); setRecipeName(''); onToast('Özel tarif cihazına kaydedildi.'); } catch { onToast('Tarif kaydedilemedi; depolama alanını kontrol et.', 'info'); } }} disabled={!recipeName.trim()} aria-label="Tarifi kaydet"><Plus size={16} /></button></div>
                 {recipes.map(recipe => <div className="recipe-row" key={recipe.id}><button onClick={() => commit(recipe.settings)}><WandSparkles size={13} /><span>{recipe.name}</span></button><button onClick={() => setRecipes(deleteRecipe(recipe.id))} aria-label={`${recipe.name} tarifini sil`}><Trash2 size={13} /></button></div>)}
               </div>
@@ -410,15 +502,15 @@ export function PhotoEditor({ session, onClose, onSave, onToast }: PhotoEditorPr
               <div className="editor-tip"><Crop size={17} /><p><strong>Sosyal medyaya hazır</strong>4:5 Instagram gönderileri, 1:1 profil ve ürün kareleri için idealdir.</p></div>
             </div>}
             {activeTab === 'color' && <AdvancedEditorPanel settings={settings} commit={commit} live={live} liveSettings={liveSettings} start={startHistory} end={endSlider} />}
-            {activeTab === 'text' && <TextEditorPanel settings={settings} commit={commit} live={live} liveSettings={liveSettings} start={startHistory} end={endSlider} selectedId={selectedTextId} setSelectedId={setSelectedTextId} />}
+            {activeTab === 'text' && <TextEditorPanel settings={settings} commit={commit} live={live} liveSettings={liveSettings} editSettings={setSettings} start={startHistory} end={endSlider} selectedId={selectedTextId} setSelectedId={setSelectedTextId} />}
           </div>
         </aside>
       </main>
 
       {freeCropOpen && <FreeCropEditor source={previewSource} initialCrop={settings.crop} onClose={() => setFreeCropOpen(false)} onApply={nextCrop => { commit({ aspectRatio: 'free', crop: nextCrop }); setFreeCropOpen(false); }} />}
       {busy === 'share' && <div className="editor-share-status glass-modal" role="status"><MyVisionLogo variant="wordmark" size={34} /><LoaderCircle className="spin" size={22} /><strong>Görüşün paylaşıma hazırlanıyor</strong></div>}
-      {exportOpen && <Modal title="Fotoğrafını dışa aktar" onClose={() => busy === null && setExportOpen(false)} className="export-modal">
-        <div className="export-preview"><img src={advancedPreview ?? previewSource} alt="Dışa aktarılacak fotoğraf" style={{ filter }} /><span><Check size={15} /> Düzenlemeler uygulandı</span></div>
+      {exportOpen && <Modal title="Fotoğrafını dışa aktar" onClose={() => { if (busy === null) { setExportOpen(false); setExportPreview(null); } }} className="export-modal">
+        <div className="export-preview">{exportPreview ? <img src={exportPreview} alt="Dışa aktarılacak fotoğrafın gerçek önizlemesi" /> : <LoaderCircle className="spin" size={24} />}<span>{exportPreview ? <Check size={15} /> : <LoaderCircle className="spin" size={15} />}{exportPreview ? 'Gerçek çıktı önizlemesi' : 'Önizleme hazırlanıyor'}</span></div>
         <div className="export-field"><label>Dosya formatı</label><div className="format-options"><button className={exportOptions.format === 'jpeg' ? 'active' : ''} onClick={() => setExportOptions({ ...exportOptions, format: 'jpeg' })}><strong>JPG</strong><small>Paylaşım için ideal</small></button><button className={exportOptions.format === 'png' ? 'active' : ''} onClick={() => setExportOptions({ ...exportOptions, format: 'png' })}><strong>PNG</strong><small>Kayıpsız kalite</small></button></div></div>
         <div className="export-field"><label>Çıktı boyutu</label><div className="size-options">{[1080, 2048, 4096].map((size) => <button key={size} className={exportOptions.maxDimension === size ? 'active' : ''} onClick={() => setExportOptions({ ...exportOptions, maxDimension: size })}><strong>{size === 4096 ? '4K' : `${size} px`}</strong><small>{size === 1080 ? 'Sosyal medya' : size === 2048 ? 'Yüksek kalite' : 'Maksimum'}</small></button>)}</div></div>
         {exportOptions.format === 'jpeg' && <EditorSlider label="Görüntü kalitesi" value={Math.round(exportOptions.quality * 100)} min={60} max={100} displayValue={`${Math.round(exportOptions.quality * 100)}%`} onChange={(value) => setExportOptions({ ...exportOptions, quality: value / 100 })} />}
@@ -426,6 +518,11 @@ export function PhotoEditor({ session, onClose, onSave, onToast }: PhotoEditorPr
         <button className="button button--lime export-confirm" onClick={() => void exportPhoto()} disabled={busy !== null}>{busy === 'export' ? <LoaderCircle className="spin" size={19} /> : <Download size={19} />}{busy === 'export' ? 'Fotoğraf işleniyor…' : 'Fotoğrafı indir'}</button>
         <p className="export-note">Orijinal fotoğrafın değiştirilmez. Yeni bir kopya oluşturulur.</p>
       </Modal>}
+      {closeConfirmOpen && <Modal title="Kaydedilmemiş değişiklikler" onClose={() => busy === null && setCloseConfirmOpen(false)} className="confirm-modal">
+        <p className="confirm-copy">Bu projede kaydedilmemiş değişiklikler var. Çıkarsan son değişiklikler kaybolacak.</p>
+        <div className="confirm-actions"><button className="button button--outline" onClick={() => setCloseConfirmOpen(false)} disabled={busy !== null}>Düzenlemeye dön</button><button className="button button--ghost" onClick={onClose} disabled={busy !== null}>Kaydetmeden çık</button><button className="button button--primary" onClick={() => void save().then(saved => { if (saved) onClose(); })} disabled={busy !== null}>{busy === 'save' ? <LoaderCircle className="spin" size={17} /> : <Save size={17} />}Kaydet ve çık</button></div>
+      </Modal>}
+      {tooltip && <div className="editor-tooltip" role="tooltip" style={{ left: tooltip.x, top: tooltip.y }}>{tooltip.text}</div>}
     </div>
   );
 }

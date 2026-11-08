@@ -6,7 +6,7 @@ import { EditorSlider } from './EditorSlider';
 export type InteractionTool = 'none' | 'radial' | 'linear';
 interface BaseProps {
   settings: EditSettings;
-  commit: (patch: Partial<EditSettings>) => void;
+  commit: (patch: Partial<EditSettings> | ((current: EditSettings) => Partial<EditSettings>)) => void;
   live: (patch: Partial<EditSettings>) => void;
   liveSettings: (updater: (current: EditSettings) => EditSettings) => void;
   start: () => void;
@@ -45,7 +45,7 @@ export function AdvancedEditorPanel(props: BaseProps) {
         <EditorSlider label="Yerel sıcaklık" value={mask.temperature} min={-100} max={100} onChange={value => updateMask('temperature', value)} onStart={start} onEnd={end} />
         <EditorSlider label="Maske boyutu" value={Math.round(mask.radius * 100)} min={5} max={100} onChange={value => updateMask('radius', value / 100)} onStart={start} onEnd={end} />
         <EditorSlider label="Yumuşak geçiş" value={Math.round(mask.feather * 100)} min={5} max={100} onChange={value => updateMask('feather', value / 100)} onStart={start} onEnd={end} />
-        <button className="tool-danger" onClick={() => commit({ masks: settings.masks.filter(item => item.id !== mask.id) })}><Trash2 size={14} /> Maskeyi sil</button>
+        <button className="tool-danger" onClick={() => commit(current => ({ masks: current.masks.filter(item => item.id !== mask.id) }))}><Trash2 size={14} /> Maskeyi sil</button>
       </div>}</>}
       <p className="tool-note">Maskenin merkezini fotoğraf üzerindeki işaretten sürükleyebilirsin.</p>
     </div></details>
@@ -56,33 +56,35 @@ export function AdvancedEditorPanel(props: BaseProps) {
   </div>;
 }
 
-interface TextProps extends BaseProps { selectedId: string | null; setSelectedId: (id: string | null) => void; }
-export function TextEditorPanel({ settings, commit, liveSettings, start, end, selectedId, setSelectedId }: TextProps) {
+interface TextProps extends BaseProps { selectedId: string | null; setSelectedId: (id: string | null) => void; editSettings: (updater: (current: EditSettings) => EditSettings) => void; }
+export function TextEditorPanel({ settings, commit, liveSettings, editSettings, start, end, selectedId, setSelectedId }: TextProps) {
   const [draft, setDraft] = useState('');
   const selected = settings.texts.find(layer => layer.id === selectedId) ?? null;
-  const update = (patch: Partial<TextLayer>) => {
+  const update = (patch: Partial<TextLayer>, immediate = false) => {
     if (!selected) return;
-    liveSettings(current => ({ ...current, texts: current.texts.map(layer => layer.id === selected.id ? { ...layer, ...patch } : layer) }));
+    const updater = (current: EditSettings): EditSettings => ({ ...current, texts: current.texts.map(layer => layer.id === selected.id ? { ...layer, ...patch } : layer) });
+    if (immediate) editSettings(updater);
+    else liveSettings(updater);
   };
   const addText = () => {
     if (!draft.trim()) return;
     const id = crypto.randomUUID();
-    commit({ texts: [...settings.texts, { id, text: draft.trim().slice(0, 80), x: .5, y: .5, size: 46, color: '#FFFFFF', font: 'sans', align: 'center', rotation: 0 }] });
+    commit(current => ({ texts: [...current.texts, { id, text: draft.trim().slice(0, 80), x: .5, y: .5, size: 46, color: '#FFFFFF', font: 'sans', align: 'center', rotation: 0 }] }));
     setSelectedId(id);
     setDraft('');
   };
   return <div className="creative-panel"><div className="panel-heading"><div><span className="eyebrow">METİN</span><h3>Fotoğrafın üzerinde anlat.</h3></div></div>
     <div className="text-composer"><input value={draft} onChange={event => setDraft(event.target.value)} maxLength={80} placeholder="Yeni metin yaz" aria-label="Yeni metin katmanı" onKeyDown={event => { if (event.key === 'Enter') addText(); }} /><button onClick={addText} disabled={!draft.trim()} aria-label="Metin ekle"><Plus size={18} /></button></div>
-    {settings.texts.length > 0 && <div className="text-layer-list" aria-label="Metin katmanları">{settings.texts.map((layer, index) => <div className={`layer-row ${selected?.id === layer.id ? 'active' : ''}`} key={layer.id}><button className="layer-select" onClick={() => setSelectedId(layer.id)} aria-pressed={selected?.id === layer.id}><Type size={15} /><span data-user-content>{layer.text || `Metin ${index + 1}`}</span></button><button className="layer-delete" onClick={() => { commit({ texts: settings.texts.filter(item => item.id !== layer.id) }); if (selected?.id === layer.id) setSelectedId(null); }} aria-label={`${layer.text} metnini sil`}><Trash2 size={15} /></button></div>)}</div>}
+    {settings.texts.length > 0 && <div className="text-layer-list" aria-label="Metin katmanları">{settings.texts.map((layer, index) => <div className={`layer-row ${selected?.id === layer.id ? 'active' : ''}`} key={layer.id}><button className="layer-select" onClick={() => setSelectedId(layer.id)} aria-pressed={selected?.id === layer.id}><Type size={15} /><span data-user-content>{layer.text || `Metin ${index + 1}`}</span></button><button className="layer-delete" onClick={() => { commit(current => ({ texts: current.texts.filter(item => item.id !== layer.id) })); if (selected?.id === layer.id) setSelectedId(null); }} aria-label={`${layer.text} metnini sil`}><Trash2 size={15} /></button></div>)}</div>}
     {selected ? <section className="text-inspector" aria-label="Seçili metni düzenle">
-      <label>Metin<input value={selected.text} maxLength={80} onFocus={start} onBlur={end} onChange={event => update({ text: event.target.value })} /></label>
-      <label>Yazı tipi<select value={selected.font} onChange={event => commit({ texts: settings.texts.map(layer => layer.id === selected.id ? { ...layer, font: event.target.value as TextLayer['font'] } : layer) })}><option value="sans">Sistem</option><option value="serif">Serif</option><option value="mono">Monospace</option></select></label>
+      <label>Metin<input value={selected.text} maxLength={80} onFocus={start} onBlur={end} onChange={event => update({ text: event.target.value }, true)} /></label>
+      <label>Yazı tipi<select value={selected.font} onChange={event => { const font = event.target.value as TextLayer['font']; commit(current => ({ texts: current.texts.map(layer => layer.id === selected.id ? { ...layer, font } : layer) })); }}><option value="sans">Sistem</option><option value="serif">Serif</option><option value="mono">Monospace</option></select></label>
       <EditorSlider label="Boyut" value={selected.size} min={12} max={140} onChange={value => update({ size: value })} onStart={start} onEnd={end} />
       <EditorSlider label="Döndürme" value={selected.rotation} min={-45} max={45} displayValue={`${selected.rotation}°`} onChange={value => update({ rotation: value })} onStart={start} onEnd={end} />
-      <div className="text-format-row"><label>Renk<input type="color" value={selected.color} onChange={event => update({ color: event.target.value })} onFocus={start} onBlur={end} /></label><div className="text-align" role="group" aria-label="Metin hizası">{([{ value: 'left', icon: AlignLeft, label: 'Sola hizala' }, { value: 'center', icon: AlignCenter, label: 'Ortala' }, { value: 'right', icon: AlignRight, label: 'Sağa hizala' }] as const).map(({ value, icon: Icon, label }) => <button key={value} className={selected.align === value ? 'active' : ''} onClick={() => commit({ texts: settings.texts.map(layer => layer.id === selected.id ? { ...layer, align: value } : layer) })} aria-label={label} aria-pressed={selected.align === value}><Icon size={18} /></button>)}</div></div>
+      <div className="text-format-row"><label>Renk<input type="color" value={selected.color} onChange={event => update({ color: event.target.value })} onFocus={start} onBlur={end} /></label><div className="text-align" role="group" aria-label="Metin hizası">{([{ value: 'left', icon: AlignLeft, label: 'Sola hizala' }, { value: 'center', icon: AlignCenter, label: 'Ortala' }, { value: 'right', icon: AlignRight, label: 'Sağa hizala' }] as const).map(({ value, icon: Icon, label }) => <button key={value} className={selected.align === value ? 'active' : ''} onClick={() => commit(current => ({ texts: current.texts.map(layer => layer.id === selected.id ? { ...layer, align: value } : layer) }))} aria-label={label} aria-pressed={selected.align === value}><Icon size={18} /></button>)}</div></div>
       <p className="tool-note">Metni fotoğraf üzerinde sürükleyerek konumlandır. Değişiklikler geri al/yinele ve dışa aktarmaya uygulanır.</p>
     </section> : settings.texts.length > 0 ? <p className="tool-note">Düzenlemek için listeden bir metin seç.</p> : <p className="tool-note">Bir metin ekledikten sonra içeriğini ve görünümünü buradan değiştirebilirsin.</p>}
-    <details className="tool-disclosure frame-control"><summary><Frame size={16} /> Çerçeve <span>{settings.frame.width ? 'Açık' : 'Kapalı'}</span></summary><div className="tool-disclosure__body"><EditorSlider label="Çerçeve kalınlığı" value={settings.frame.width} min={0} max={100} onChange={value => liveSettings(current => ({ ...current, frame: { ...current.frame, width: value } }))} onStart={start} onEnd={end} /><div className="creative-options"><input type="color" value={settings.frame.color} onChange={event => commit({ frame: { ...settings.frame, color: event.target.value } })} aria-label="Çerçeve rengi" /><span>{settings.frame.width ? 'Aktif' : 'Kapalı'}</span></div></div></details>
+    <details className="tool-disclosure frame-control"><summary><Frame size={16} /> Çerçeve <span>{settings.frame.width ? 'Açık' : 'Kapalı'}</span></summary><div className="tool-disclosure__body"><EditorSlider label="Çerçeve kalınlığı" value={settings.frame.width} min={0} max={100} onChange={value => liveSettings(current => ({ ...current, frame: { ...current.frame, width: value } }))} onStart={start} onEnd={end} /><div className="creative-options"><input type="color" value={settings.frame.color} onChange={event => commit(current => ({ frame: { ...current.frame, color: event.target.value } }))} aria-label="Çerçeve rengi" /><span>{settings.frame.width ? 'Aktif' : 'Kapalı'}</span></div></div></details>
     <div className="editor-tip"><Grip size={17} /><p><strong>Katmanları doğrudan taşı</strong>Metni fotoğraf üzerinde sürükleyebilir, geri al/yinele ile değişiklikleri geri getirebilirsin.</p></div>
   </div>;
 }
