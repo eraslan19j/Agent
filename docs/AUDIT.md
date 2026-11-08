@@ -1,116 +1,43 @@
-# My Vision denetim kaydı
+# Aşama 1 doğrulama raporu — 7 Kasım 2026
 
-## Aşama 1 — Kritik hatalar ve editör geometrisi
+## Kapsam
 
-### Bulunan hatalar ve çözümler
+Bu tur yalnız temizlik, sade sistem tasarımı, doğrulamalı yerel depolama, sonradan düzenlenebilen fotoğraf metni ve FFmpeg teknik doğrulamasını kapsar. Video editörü arayüzü ve bulut/hesap çalışması eklenmemiştir.
 
-1. **Keşfet modalı ile import overlay’inin yaşam döngüsü ayrıydı.** Native geri işlemi açık fotoğraf önizlemesini bilmiyor, fetch/prepare işlemi iptal edilemiyor ve gecikmeli async sonuçlar başka ekranda oturum açabiliyordu.
-   - Önizleme `createPortal` ile `document.body` üzerine taşındı; stacking context ve bulanık backdrop zinciri kırıldı.
-   - Bütün galeri/keşif import işlemleri generation + `AbortController` ile yönetiliyor.
-   - Geri, `Escape`, backdrop, kapat ve İptal yolları aynı temizleme mantığına bağlandı.
-   - Eski async sonuçların editör açması engellendi; scroll kilidi merkezileştirildi.
+## Otomatik kontroller
 
-2. **Servis hatası kullanıcıya işlem bazında gösterilmiyordu.**
-   - HTTP, zaman aşımı, geçersiz görsel ve iptal ayrıştırıldı.
-   - Hata açık önizlemenin içinde gösteriliyor; “Tekrar dene” aynı fotoğrafı yeniden alıyor.
-   - Yükleme overlay’i başarı, hata, iptal ve geri durumlarında kapanıyor.
+- Vitest: **5 dosya, 40/40 test geçti**.
+- ESLint: **geçti**.
+- TypeScript ve Vite production build: **geçti**.
+- FFmpeg production varlık kontrolü: **25 MiB sınırı, Brotli decode, boyut ve SHA-256 geçti**.
+- Browser regresyonu: **10/10 kontrol geçti**.
+- axe-core WCAG 2 A/AA + 2.1 AA: mobil koyu ana sayfa, mobil metin editörü ve masaüstü açık ana sayfada **0 ihlal**.
+- Görsel incelemede bulunan metin kırpılması, tek harflik son satır ve mobil geri al/yinele sorunları düzeltildikten sonra kontroller tekrarlandı.
 
-3. **Önizleme erişilebilirliği ve odak davranışı eksikti.**
-   - Dialog başlığı, odaklanabilir dialog, Escape ve açıklayıcı kart etiketleri eklendi.
-   - Önizleme yüklenme durumu ayrı gösteriliyor; boş/bulanık pencere yerine gerçek yüklenme göstergesi var.
+## Gerçek browser kanıtları
 
-4. **EXIF yönü iki kez uygulanabiliyordu.** Chromium tabanlı decoder, `imageOrientation: 'none'` verilse bile bazı JPEG’leri döndürülmüş döndürüyor.
-   - EXIF orientation ve JPEG SOF ham ölçüleri okunuyor.
-   - Bitmap ölçüleri SOF ölçüleriyle karşılaştırılarak decoder’ın EXIF’i uyguladığı tespit ediliyor.
-   - Sekiz EXIF yönü için transform, doğru canvas ölçüleri ve `ImageBitmap.close()` bellek temizliği eklendi.
+- Metin eklendi; mevcut katman seçilip içeriği, fontu ve hizası değiştirildi.
+- Gerçek JPEG indirildi: **1200 × 1600 px**; uzun sağa hizalı metin tamamen okunabilir çıktı.
+- Proje kaydedildi, sayfa yenilendi ve düzenlenmiş metin IndexedDB’den geri yüklendi.
+- Eski localStorage projesi browser’da migrate edildi; desteklenen metin korundu ve doğrulama sonrası eski anahtar kaldırıldı.
+- Bozuk/eski veri hatasında localStorage’ın korunması birim testleriyle doğrulandı.
+- Mobil editörde görünür button hedeflerinin tamamı en az 44 × 44 px ölçüldü.
 
-5. **Editör yalnızca window resize’a bağımlıydı.**
-   - `ResizeObserver`, `orientationchange`, `visualViewport.resize` ve `visualViewport.scroll` birlikte kullanılıyor.
-   - Görüntü merkezde tutuluyor; panorama/dikey/yatay ölçüleri korunuyor.
-   - Eski fotoğraf yükleme sonuçlarının yeni oturumu değiştirmesi engellendi.
+## FFmpeg smoke
 
-### Doğrulama
+- Core: **0.12.10**, tek iş parçacıklı.
+- Ham WASM: **32.232.419 byte (30,74 MiB)**.
+- Brotli: **7.280.521 byte (6,94 MiB)**.
+- Headless Chromium’da Worker ve sıkıştırılmış çekirdek yüklendi.
+- Gerçek küçük WebM üretilip MP4/H.264+AAC çıktıya dönüştürüldü.
+- MP4 imza ve stream kontrolleri geçti; çıktı browser’da **64 × 64, yaklaşık 1,014 saniye** oynatıldı.
+- Tarayıcı konsolunda hata görülmedi.
 
-- 22 birim testi, production TypeScript/Vite build ve ESLint başarılı.
-- Keşif `503`: yükleme overlay’i kapandı, açık hata ve Tekrar dene gösterildi.
-- İptal ve Escape: backdrop, importing overlay ve scroll kilidi temizlendi; gecikmeli yanıt editör açmadı.
-- Keşif başarı akışı: uzak fotoğraf cihaz içi kaynağa dönüştü ve editör açıldı.
-- EXIF orientation=6, 400×200 JPEG: çıktı doğru şekilde 200×400.
-- Dikey 1200×1600 ve panorama 4000×1000: oran korundu, merkezleme ve viewport değişimi doğrulandı.
-- Proje kaydet/yeniden aç: Noir %85 ve proje kimliği korunarak geri yüklendi.
+## Henüz doğrulanmayanlar
 
-## Aşama 2 — Üretilen görselden marka sistemi
+- Fiziksel Poco/HyperOS cihaz davranışı ve gerçek Android kamera/galeri izinleri
+- Android’de Documents/My Vision kaydı ve native paylaşım sayfası
+- Fiziksel cihazda eski localStorage verisiyle uygulama güncelleme migrasyonu
+- Play Store imzalı AAB gönderimi ve mağaza formları
 
-- Kodla çizilen eski SVG göz/diyafram kaldırıldı; seçilen AI üretimi raster ikon `resources/generated-vision-icon.png` tek kaynak oldu.
-- Kaynak görselden antialias alfa maskesi çıkarıldı ve ana renkler `#FFC400` / `#0A0A0A` olarak normalize edildi.
-- Android adaptive foreground/background, yuvarlak ikon, Android 13 monochrome, 192/512 PWA, maskable PWA, 32/64 favicon, Play Store 512 ve 1024×500 öne çıkan görsel üretildi.
-- Uygulama içi logo bileşeni artık üretilen raster ikonu ve erişilebilir metin lockup’ını kullanıyor.
-- Native splash varyantları ve mağaza kapağı yeni ikonla yenilendi; 48 px okunabilirlik ve mobil taşma kontrol edildi.
-- Production build, 22 test ve ESLint başarılı.
-
-## Aşama 3 — Merkezi tema, ayarlar ve tema uyumlu splash
-
-- AMOLED (`#000`), Koyu, Açık ve Sistem temaları; Sarı/Mavi/Yeşil/Kırmızı/Mor ve Android 12+ dinamik vurgu eklendi.
-- Liquid Glass/Sade, ayrı blur azaltma ve açılış animasyonu tercihleri eklendi; tercihler anında uygulanıp `myvision.preferences.v2` altında kalıcı oldu.
-- Tema ve vurgu, ilk boyamadan önce `index.html` içinde uygulanıyor; sistem teması değişimi canlı izleniyor.
-- Profil üzerinden erişilen yeni Ayarlar ekranı ve geri davranışı eklendi.
-- Native `Theme` plugin’i tema/animasyon tercihlerini SharedPreferences’a yazıyor, dinamik sistem rengini ve sistem çubuğu görünümünü güncelliyor.
-- Android 12+ `windowSplashScreen*`, Android 11 ve altı drawable varyantları; AMOLED/Açık launch temaları eklendi. Uygulama içi geçiş hazır olduktan sonra kapanıyor, dokunmayla geçilebiliyor ve yalnız transform/opacity kullanıyor.
-- Kontrollü Chromium: AMOLED `#000`, Açık `#F3F3EF`, sistem dark/light canlı geçişi, mavi vurgu ve reload kalıcılığı, Sade/blur, splash kapalıyken mount olmama ve 390 px taşma kontrolü geçti.
-- Production build, ESLint, Capacitor sync ve 26 test başarılı. Native derleme ve fiziksel soğuk/sıcak açılış ölçümü bu aşamada yapılmadı.
-
-## Aşama 4 — Cihaz içi yaratıcı araçlar ve arşiv
-
-- Rakip araştırması ve resmî kaynak bağlantıları `docs/RESEARCH.md` içine yazıldı; bulut/ücretli AI veya ağır çalışma zamanı eklenmedi.
-- Serbest normalize kırpma; Story/Post/Kapak oranları; straighten için boş köşe bırakmayan cover ölçeği; yatay/dikey perspektif; Curves; 7 kanal HSL; radyal/lineer seçici maskeler eklendi.
-- Yerel doku harmanlı healing/nesne, kırmızı göz, gürültü azaltma, keskinleştirme, kenar-renk tabanlı arka plan kaldırma eklendi. Arka plan ve nesne araçları klasik algoritmadır; AI olarak sunulmaz.
-- Metin (3 font), taşınabilir çıkartma, gerçek fırça konturları, çerçeve, canlı 48 bölgeli histogram, grid, pinch/button zoom, önce–sonra ve 40 adımlı geri al/yinele birlikte çalışıyor.
-- Portre/Manzara/Yemek/Gece/Vintage dahil 16 hazır görünüm; ayar kopyala/yapıştır ve en fazla 30 kalıcı özel tarif eklendi.
-- Gerçek çoklu dosya Kolaj (Story/Post/Kapak, filtre, aralık, arka plan, başlık) ve Batch (12 dosya, ortak/kopyalanmış ayar, filigran, boyut, gerçek ilerleme ve hata listesi) stüdyoları eklendi.
-- Albüm/favori/etiket proje modeline eklendi; arama bu alanları ve ismi kapsıyor. İlk açılış onboarding’i kalıcı ve geçilebilir.
-- Gelişmiş önizleme düşük çözünürlüklü gerçek render kullanıyor; export aynı motorla kaynak çözünürlüğünde çalışıyor.
-- Mobil tam-ekran araç dock’unun fotoğraf dokunuşlarını kapatması ve gelişmiş preview’ın `left/top:50%` ofseti QA sırasında bulunup düzeltildi.
-- Kontrollü Chromium: Curves/HSL/radyal maske/healing/metin/fırça/free crop/özel tarif/save/export geçti; kayıtta 1 metin, 1 maske, 1 rötuş, 1 kontur, HSL 20 ve `free` doğrulandı; gerçek JPG indirildi.
-- Kolaj çıktısı Sharp ile **1080×1920** doğrulandı; batch iki ayrı JPG üretti; favori/albüm/etiket araması geçti.
-- Regresyon: Noir %85 ve proje kimliği, Discover 503/retry/iptal/Escape/scroll temizliği, EXIF 200×400, dikey ve panorama merkezleme yeniden geçti.
-- Production build, ESLint ve 33 test başarılı. Fiziksel cihaz ölçümü yapılmadı.
-
-## Aşama 5 — Worker, bellek ve ölçülen performans
-
-- Base tone/grain, noise/sharpen, Curves/HSL, maskeler, kırmızı göz ve arka plan alfa işlemleri saf `pixelProcessing` fonksiyonuna ayrıştırıldı.
-- Vite ayrı `pixelWorker` bundle’ı üretiyor; `ArrayBuffer` transfer kopyalama yerine sahiplik aktarıyor. Worker yoksa/oluşturulamazsa aynı saf pipeline ana thread fallback’iyle çalışıyor. Timeout’ta worker terminate ediliyor.
-- Gelişmiş önizleme en fazla 1100 px; export kaynak çözünürlüğü ve 2800 px kaynak hazırlama sınırı korunuyor. Preview blob URL’leri revoke ediliyor.
-- Layout animasyonu yerine photo-stage transform geçişi; onboarding indicator transform/opacity kullanımı eklendi.
-- Piksel merkezi koordinat düzeltmesi unit testle yakalandı ve uygulandı. Neutral pixel, lokal maske, kırmızı göz ve border-background alfa testleri eklendi; toplam 37 test geçti.
-- Worker açıkken gelişmiş editör ve batch yeniden geçti. Worker tamamen devre dışıyken Curves + JPG export geçti.
-- Kontrollü PNG: köşe alfa 0, kontrast subject içinde alfa 255; straighten JPG’de boş/siyah köşe yok; canlı histogram ve sentetik iki-parmak %200 zoom geçti.
-- Production Chromium ölçümü: açılış **724 ms**, 2800×700 ağır export **453 ms**, JS heap yaklaşık **12,7 MB**. Export sırasında bir **114 ms** ana-thread long task ölçüldü; canvas readback/writeback ana thread’de kaldığı için kesintisiz 120 Hz doğrulanmış sayılmaz.
-- Fiziksel Poco X7 Pro, HyperOS, 120 Hz ekran ve native bellek ölçümü yapılmadı.
-
-## Aşama 6 — Play uyumluluğu, satın alma ve erişilebilirlik
-
-- Sürüm **1.3.0 / versionCode 4**. Resmî Google Play hedef API rehberi doğrulandı: 31 Ağustos 2026 sonrası yeni uygulama/güncelleme için API 36; proje compile/target SDK 36.
-- AGP 8.13.0. Debug CI’ya `zipalign -c -P 16 -v 4` ve `.so` sayımı eklendi. Uygulama custom NDK kütüphanesi içermiyor; native kütüphane görülürse ELF ve 16 KB cihaz testi zorunlu. 1 Şubat 2027 yayın engeli tarihi dokümante edildi.
-- `android-release.yml`: yalnızca manuel, dört GitHub Actions secret’ıyla imzalı AAB üretir. Anahtar ve properties `$RUNNER_TEMP` içinde tutulur; secret yoksa iş başarısız olur ve imzasız paket yayınlanmaz. Bu ortamda secret olmadığı için imzalı AAB üretilmedi.
-- Eski `myvision.pro.preview` satın alma yolu ve localStorage’dan Pro yükleme kaldırıldı. Web’de satın alma/geri yükleme kapalı; native entitlement dinlemesi eklendi.
-- Paywall sabit ₺149,99/₺899,99, %50 ve koşulsuz 7 gün iddialarını kaldırdı. Fiyat `selected.product.priceString`, deneme gerçek default option FREE_TRIAL fazından okunur; paket yoksa CTA kapalı ve hata açık.
-- `.env.example` aylık/yıllık RevenueCat package ID alanlarını içeriyor. Gerçek Play/RevenueCat ürünleri yapılandırılmadığından satın alma işlemi yapılmadı.
-- TR/EN canlı arayüz, kalıcı dil tercihi, erişilebilir ad/placeholder çevirileri ve dinamik mağaza metinleri eklendi. `privacy-en.html`, `terms-en.html` ve İngilizce mağaza metni oluşturuldu.
-- İngilizce editörün Looks/Adjust/Crop/Color/Retouch/Create/Export ekranlarında görünür Türkçe metin taraması boş döndü. Dinamik preset/mağaza metinleri de çevriliyor.
-- Modal: ilk odak, Tab/Shift+Tab odağı sınırlama, Escape ve kapanışta odak iadesi; onClose değişiminde input odağının sıfırlanması regresyonu giderildi.
-- İkincil metinler 12 px’e yükseltildi, etiketsiz file/studio inputları ve mobil icon-only save/export erişilebilir adları eklendi. Açık/koyu tema kontrastları düzeltildi.
-- axe-core 4.14 WCAG 2 A/AA + 2.1 AA: **home, paywall, editor, editor-color, editor-retouch, editor-create, settings, settings-light, home-light, paywall-light — 10/10 ihlalsiz.**
-- E2E: TR/EN canlı geçiş + reload kalıcılığı, eski Pro bayrağının etkisizliği, sabit fiyat/deneme olmaması, kapalı web satın alma/restore ve İngilizce yasal linkler geçti.
-- Regresyon: Worker aktif gelişmiş editör, Worker kapalı JPG, PNG alfa/straighten/histogram/%200 pinch, 1080×1920 kolaj, iki batch JPG, watermark ve arşiv metadata akışları yeniden geçti.
-- 37 test, ESLint, TypeScript/Vite build ve `git diff --check` başarılı.
-- Yayın blokları: aktif destek adresi ve public HTTPS yasal URL’ler sağlanmalı; RevenueCat/Play ürünleri ve lisans test hesabı yapılandırılmalı; imza secret’ları eklenmeli; gerçek Android cihazlarda satın alma ve fiziksel Poco/HyperOS QA yapılmalı.
-
-## Native Android paket sonucu
-
-- Son CI: https://github.com/eraslan19j/Agent/actions/runs/42463266756 — **success**; test/lint, web build, Capacitor sync, `assembleDebug`, target SDK 36 ve 16 KB zipalign adımları geçti.
-- İndirilebilir APK: https://github.com/eraslan19j/Agent/releases/download/my-vision-v1.3.0-debug/My-Vision-1.3.0-debug.apk
-- Release: https://github.com/eraslan19j/Agent/releases/tag/my-vision-v1.3.0-debug — APK boyutu **10.629.965 bayt**.
-- CI’nın üretip release notuna yazdığı SHA-256: **`eb3c560fbcdeb2be5cd3596a038f3a1beac18417ce1e8bbedc25456820262b8d`**. Ayrı `.sha256` asset’i de yayımlandı.
-- Sandbox release-assets hostuna yönlendirilen indirmeyi tamamlayamadığı için APK yerel olarak ikinci kez indirilip kurulmadı; hash değeri CI çıktısıdır.
-- `store/screenshots/` üç görseli güncel 1.3.0 arayüzüyle 900×2000 olarak yenilendi. Bunlar gerçek uygulamanın kontrollü Chromium görüntüleridir; fiziksel Android ekran görüntüsü iddiası değildir.
-- İmzalı Play AAB workflow’u hazır fakat secret bulunmadığından çalıştırılmadı. Debug APK fiziksel Poco X7 Pro/HyperOS veya başka bir cihazda kurulup test edilmedi.
+Bu maddeler tamamlanmış veya başarılı olarak sunulmamalıdır.

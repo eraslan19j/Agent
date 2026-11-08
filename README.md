@@ -1,98 +1,85 @@
-# My Vision — Profesyonel Fotoğraf Stüdyosu
+# My Vision — Yerel Fotoğraf Stüdyosu
 
-My Vision; fotoğraf düzenleme, ilham keşfi, yerel proje arşivi ve Pro abonelik modelini birleştiren, mobil öncelikli bir fotoğraf uygulamasıdır. React + TypeScript arayüzü Capacitor ile native Android projesine paketlenir.
+My Vision; görünümler, hassas fotoğraf ayarları, kadraj, düzenlenebilir metin, kolaj ve toplu işlem araçlarını birleştiren ücretsiz, mobil öncelikli bir fotoğraf uygulamasıdır. React + TypeScript arayüzü Capacitor ile Android uygulamasına paketlenir. Fotoğraflar ve projeler cihazda işlenir; hesap, ödeme veya bulut servisi gerekmez.
 
 ## Özellikler
 
-- **12 imza görünümü:** Portre, sinema, seyahat ve siyah-beyaz koleksiyonları
-- **Gerçek görüntü işleme:** Pozlama, parlaklık, kontrast, doygunluk, sıcaklık, parlak alanlar, gölgeler, solma, vinyet ve deterministik film greni
-- **Kadraj araçları:** Merkezden oran kırpma, 90° döndürme ve yatay/dikey aynalama
-- **Önce / sonra:** Sürüklenebilir karşılaştırma çizgisi
-- **Düzenleme geçmişi:** Geri al, yinele ve sıfırla
-- **Yerel projeler:** Küçük resimli proje kaydı, arama, filtreleme ve silme
-- **Dışa aktarma:** JPG/PNG, kalite kontrolü, 1080/2048/4096 px; Android’de Documents/My Vision klasörüne kaydetme
-- **Paylaşım:** Android native paylaşım sayfası ve Web Share API
-- **Kamera ve galeri:** JPG, PNG ve WebP; büyük görselleri güvenli boyuta hazırlama
-- **Freemium:** Free özellikler, Pro paywall, aylık/yıllık plan ve satın alım geri yükleme
-- **Gizlilik:** Fotoğraf işleme cihazda; reklam takipçisi yok
-- **Native deneyim:** Android 7.0+, Huawei/HarmonyOS dahil çentik ve sistem çubuğu güvenli alanları, kamera dönüşü yerleşim koruması, özel ikonlar ve koyu tema
-- **1.2.0 tasarımı:** `#FFC400` sarı + `#0A0A0A` siyah Liquid Glass, tek SVG kaynaklı göz/diyafram logosu ve animasyonlu açılış
-- **Gerçek keşif:** Lorem Picsum üzerinden her seferinde değişen fotoğraflar, görünür fotoğrafçı/kaynak bilgisi ve stüdyoya aktarma
-- **Güvenilir kadraj:** Ölçülen önizleme geometrisi; Orijinal, kare ve 90° döndürme geçişlerinde siyah görüntü oluşmaz
-- **1.1.0 araçları:** Netlik, yumuşak odak, canlı vinyet/gren ve basılı tutarak orijinal fotoğrafı görüntüleme
+- **Görünümler ve görüntü işleme:** Pozlama, parlaklık, kontrast, doygunluk, sıcaklık, ton eğrileri, HSL, seçici maskeler, netlik ve film greni
+- **Kadraj:** Oranlı/serbest kırpma, döndürme, perspektif ve aynalama
+- **Düzenlenebilir metin:** İçerik, konum, boyut, renk, yazı tipi, hizalama ve döndürme; uzun metinlerde güvenli satır kaydırma
+- **Çalışma geçmişi:** Geri al, yinele, önce/sonra ve sıfırlama
+- **Yerel projeler:** IndexedDB içinde ayrı medya Blob’ları ve proje metadata’sı; arama, filtreleme, favori, albüm ve etiketler
+- **Güvenli eski veri aktarımı:** localStorage kaydı IndexedDB’ye yazılıp tekrar okunarak doğrulanmadan eski kayıt silinmez
+- **Stüdyo:** Gerçek çok fotoğraflı kolaj ve ortak ayarlarla toplu dışa aktarma
+- **Dışa aktarma:** JPG/PNG, kalite ve 1080/2048/4096 px seçenekleri; Android’de Documents/My Vision
+- **Sade sistem tasarımı:** Sistem fontu, nötr zeminler, mavi vurgu, açık/koyu/sistem teması, en az 44 px dokunma hedefleri
+- **Gizlilik:** Cihaz içi işleme, reklam takipçisi yok, zorunlu ağ servisi yok
 
 ## Hızlı başlangıç
+
+Node.js 22 önerilir.
 
 ```bash
 npm ci
 npm run dev
 ```
 
-Tarayıcıda gösterilen adrese gidin. Web önizlemesinde “Pro önizlemeyi etkinleştir” düğmesi ödeme almaz; yalnızca premium deneyimi test eder.
-
 ### Kontroller
 
 ```bash
-npm run build   # TypeScript + production build
-npm run test    # Görüntü motoru birim testleri
-npm run lint    # ESLint
+npm run test         # Birim ve migrasyon testleri
+npm run lint         # ESLint
+npm run build        # FFmpeg varlıkları + TypeScript + production build + boyut/hash kontrolü
+npm run test:ffmpeg  # Gerçek Chromium Worker, WebM→MP4 ve playback testi
 ```
+
+FFmpeg yalnızca gelecekteki video işlem hattının teknik doğrulamasıdır; bu sürümde video editörü arayüzü yoktur. Tek iş parçacıklı çekirdek Brotli ile yaklaşık 6,94 MiB’a indirilir. Statik sunucu `.wasm.br` dosyasını `Content-Encoding: br` ve `Content-Type: application/wasm` başlıklarıyla sunmalıdır; örnek kurallar `public/_headers` içindedir.
 
 ## Android
 
-**Hazır test APK'sı:** [My Vision v1.2.0 debug APK](https://github.com/eraslan19j/Agent/releases/download/my-vision-v1.2.0-debug/My-Vision-1.2.0-debug.apk)
+**Kurulabilir test paketi:** [My Vision v1.4.0 debug APK](https://github.com/eraslan19j/Agent/releases/download/my-vision-v1.4.0-debug/My-Vision-1.4.0-debug.apk)
 
 Yerel derleme gereksinimleri: JDK 21, Android Studio ve Android SDK 36.
 
 ```bash
 npm run cap:sync
-npm run android
-```
-
-veya komut satırından debug APK:
-
-```bash
 cd android
 ./gradlew assembleDebug
 ```
 
-İmzalı Play Store AAB üretimi, RevenueCat ayarları ve release imzalama adımları için **[docs/PLAY_STORE.md](docs/PLAY_STORE.md)** dosyasını izleyin.
+Debug paketi cihaz sınaması içindir. Play Store için imzalı AAB gerekir; ayrıntılar **[docs/PLAY_STORE.md](docs/PLAY_STORE.md)** içindedir.
 
 ## Proje yapısı
 
 ```text
 src/
-  components/       Ana sayfa, keşfet, projeler, profil, paywall ve editör
-  brand/            Tek kaynaklı SVG logo ve marka renkleri
+  components/       Ana sayfa, projeler, profil, fotoğraf editörü ve stüdyo
   data/             Görünüm tanımları
-  lib/              Canvas görüntü motoru, depolama, indirme ve RevenueCat
+  lib/              Görüntü motoru, IndexedDB, indirme ve teknik video doğrulaması
   types/            Ortak TypeScript tipleri
 android/            Native Capacitor Android projesi
 public/
-  icons/            Tek kaynaktan üretilen PWA ikonları
-  privacy.html      Gizlilik politikası
-  terms.html        Kullanım koşulları
+  ffmpeg/           Sıkıştırılmış çekirdek, manifest ve lisanslar
+  privacy*.html     Gizlilik politikaları
+  terms*.html       Kullanım koşulları
+qa/                 Ayrı FFmpeg browser smoke sayfası
+scripts/            Varlık üretimi ve teknik doğrulama
 resources/          İkon ve splash kaynakları
-store/              Play Store ikonu, kapak görseli ve gerçek ekran görüntüleri
-scripts/            Mağaza varlığı üretici
+store/              Mağaza görselleri ve ekran görüntüleri
 ```
 
-## Görüntü motoru
+## Veri ve görüntü motoru
 
-`src/lib/imageEngine.ts` CSS önizleme ile Canvas çıktısını aynı ayar modelinden üretir. Orijinal dosya değiştirilmez. Çıktı; kırpılmış ve döndürülmüş boyutları korur, cihaz belleğini korumak için seçilen maksimum kenara ölçeklenir. Gren rastgele çekirdekli olduğundan önizleme/çıktı yaklaşımı deterministiktir.
+`src/lib/storage.ts` medya Blob’unu ve proje metadata’sını IndexedDB’de ayrı saklar. Eski localStorage projeleri desteklenen düzenlemeler korunarak aktarılır; kaldırılan özelliklere ait eski alanlar atılır. Aktarımın tamamı doğrulanamazsa eski kayıt korunur.
 
-## Yayından önce zorunlu işler
+`src/lib/imageEngine.ts` ve `advancedImageEngine.ts` önizleme ile Canvas çıktısını aynı ayar modelinden üretir. Orijinal dosya değiştirilmez. Çıktı; kırpılmış/döndürülmüş boyutları korur ve seçilen maksimum kenara ölçeklenir.
 
-- Gerçek destek e-posta adresini yapılandırın.
+## Yayından önce
+
 - `com.myvision.studio` paket sahipliğini doğrulayın.
-- RevenueCat public Android key ve Play ürünlerini bağlayın.
-- Gizlilik/koşul sayfalarını herkese açık HTTPS adresinde yayınlayın.
-- Mağaza fiyatlarını Play Console ile eşleştirin.
-- Gerçek Android cihazlarda satın alma, kamera ve dışa aktarma testlerini yapın.
-- `versionCode` ve imzalama anahtarını güvenli biçimde yönetin.
+- Gizlilik ve koşul sayfalarını herkese açık HTTPS adresinde yayınlayın.
+- Gerçek Android cihazlarda kamera, galeri, kayıt, JPG/PNG çıktı ve paylaşımı test edin.
+- Mağaza metinlerini ve ekran görüntülerini güncel sürümle eşleştirin.
+- `versionCode` değerini artırın ve imzalama anahtarını güvenli biçimde yönetin.
 
-Ayrıntılar: [Play Store rehberi](docs/PLAY_STORE.md) · [Mağaza metni](docs/store-listing-tr.md) · [Gelir modeli](docs/MONETIZATION.md)
-
-## Not
-
-Bu çalışma ortamında JDK/Android SDK bulunmadığından AAB/APK burada derlenmemiştir. Web production derlemesi, TypeScript, lint ve birim testleri doğrulanır; native proje Android Studio’da derlenmeye hazırdır.
+Ayrıntılar: [Play Store rehberi](docs/PLAY_STORE.md) · [Türkçe mağaza metni](docs/store-listing-tr.md) · [Doğrulama raporu](docs/AUDIT.md)
