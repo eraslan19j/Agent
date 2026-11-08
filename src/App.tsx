@@ -20,12 +20,13 @@ import type { ToastMessage } from './components/Toast';
 import { preparePhoto } from './lib/imageEngine';
 import { applyPreferences, loadPreferences, persistPreferences, watchSystemTheme, type AppPreferences } from './lib/preferences';
 import { setLocalizationLanguage } from './lib/localization';
-import { hasOnboarded, loadProjects, persistProjects, setOnboarded } from './lib/storage';
+import { deleteStoredProject, hasOnboarded, initializeStorage, releaseProjectUrls, saveStoredProject, setOnboarded, updateStoredProject } from './lib/storage';
 import type { AppView, EditorSession, PhotoProject } from './types';
 
 export default function App() {
   const [view, setView] = useState<AppView>('home');
-  const [projects, setProjects] = useState<PhotoProject[]>(() => loadProjects());
+  const [projects, setProjects] = useState<PhotoProject[]>([]);
+  const [storageStatus, setStorageStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [session, setSession] = useState<EditorSession | null>(null);
   const [studio, setStudio] = useState<'collage' | 'batch' | null>(null);
   const [onboardingOpen, setOnboardingOpen] = useState(() => !hasOnboarded());
@@ -43,6 +44,18 @@ export default function App() {
     setToast({ id: Date.now(), text, type });
     toastTimer.current = setTimeout(() => setToast(null), 3600);
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    void initializeStorage().then(result => {
+      if (!active) return;
+      setProjects(result.projects);
+      setStorageStatus('ready');
+      if (result.migratedCount > 0) showToast(`${result.migratedCount} proje güvenli biçimde yeni yerel depolamaya taşındı.`);
+      if (result.warning) showToast(result.warning, 'info');
+    }).catch(() => { if (active) setStorageStatus('error'); });
+    return () => { active = false; };
+  }, [showToast]);
 
   const cancelImport = useCallback(() => {
     importTaskRef.current.generation += 1;
@@ -155,29 +168,36 @@ export default function App() {
       tags: existing?.tags,
       isSample: false,
     };
-    const next = [saved, ...projects.filter((project) => project.id !== saved.id)];
-    if (!persistProjects(next)) throw new Error('Cihaz depolama alanı doldu. Eski projeleri silip tekrar deneyin.');
-    setProjects(next);
-    return saved;
+    let persisted: PhotoProject;
+    try { persisted = await saveStoredProject(saved); }
+    catch { throw new Error('Proje kaydedilemedi. Cihaz depolama alanını kontrol edip tekrar deneyin.'); }
+    setProjects(current => [persisted, ...current.filter((project) => project.id !== persisted.id)]);
+    return persisted;
   };
 
   const deleteProject = (id: string) => {
-    const next = projects.filter((project) => project.id !== id);
-    if (persistProjects(next)) {
-      setProjects(next);
+    void deleteStoredProject(id).then(() => {
+      const removed = projects.find(project => project.id === id);
+      if (removed) releaseProjectUrls([removed]);
+      setProjects(current => current.filter((project) => project.id !== id));
       showToast('Proje cihazından silindi.', 'info');
-    } else showToast('Proje silinemedi.', 'info');
+    }).catch(reason => showToast(reason instanceof Error ? reason.message : 'Proje silinemedi.', 'info'));
   };
 
   const updateProject = (id: string, patch: Partial<PhotoProject>) => {
-    const next = projects.map(project => project.id === id ? { ...project, ...patch, updatedAt: Date.now() } : project);
-    if (persistProjects(next)) setProjects(next);
-    else showToast('Proje bilgileri kaydedilemedi; depolama alanını kontrol et.', 'info');
+    const updatedAt = Date.now();
+    void updateStoredProject(id, { ...patch, updatedAt }).then(() => {
+      setProjects(current => current.map(project => project.id === id ? { ...project, ...patch, updatedAt } : project));
+    }).catch(reason => showToast(reason instanceof Error ? reason.message : 'Proje bilgileri kaydedilemedi.', 'info'));
   };
 
   const openProject = (project: PhotoProject) => {
     setSession({ source: project.source, name: project.name, projectId: project.id, initialSettings: project.settings });
   };
+
+  if (storageStatus !== 'ready') {
+    return <main className="storage-gate" aria-live="polite"><MyVisionLogo size={64} />{storageStatus === 'loading' ? <><LoaderCircle className="spin" size={24} /><h1>Projelerin hazırlanıyor</h1><p>Yerel çalışmaların doğrulanıyor.</p></> : <><h1>Projeler açılamadı</h1><p>Eski verilerin silinmedi. Tarayıcı depolama iznini kontrol edip tekrar dene.</p><button className="button button--primary" onClick={() => window.location.reload()}>Tekrar dene</button></>}</main>;
+  }
 
   return (
     <div className="app-shell">
